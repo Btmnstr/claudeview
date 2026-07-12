@@ -206,3 +206,7 @@ Hook / launcher environment variables (`CLAUDEVIEW_DIR`, `CLAUDEVIEW_URL`,
 - Interactive questions / two-way control — this surface only *shows*.
 - `mix release` slimming; the prototype runs `mix run --no-halt`.
 - A `Write`-matcher hook for `docs/**.md` (easy to add later).
+
+## License
+
+[MIT](LICENSE) © Virtual Void Stockholm AB
