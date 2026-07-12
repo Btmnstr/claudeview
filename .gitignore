@@ -1,0 +1,13 @@
+# Runtime content (each .md becomes a tab); keep only the seed tab.
+content/*
+!content/welcome.md
+
+# Build artifacts (produced inside Docker).
+server/_build/
+server/deps/
+web/elm-stuff/
+web/elm.js
+*.beam
+
+# Local, machine-specific Claude Code permissions.
+.claude/settings.local.json

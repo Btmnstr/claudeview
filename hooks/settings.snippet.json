@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/ClaudeView/hooks/claudeview-push last-message"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/ClaudeView/hooks/claudeview-push plan"
+          }
+        ]
+      }
+    ]
+  }
+}
