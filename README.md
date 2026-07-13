@@ -130,12 +130,38 @@ start, so open a **new** Claude Code session for them to take effect.
 Add a line like this to your project `CLAUDE.md`:
 
 > To display something on the ClaudeView viewer, write it to
-> `~/.claudeview/<short-name>.md` (kebab-case). Each file is a tab.
+> `~/.claudeview/<tab>.md` (kebab-case) — each file is a tab. Lead the name with
+> the project you are working in, so a viewer shared by several sessions shows
+> which one wrote each tab, e.g. `myproject-plan.md`, `myproject-review.md`.
+> Reuse a stable name so an update replaces the tab instead of spawning a new one.
 
 Claude then curates the viewer with the ordinary `Write` tool — no MCP. This is
 the **most reliable** path: unlike the `Stop` hook it does not depend on session
 lifecycle or transcript timing, so it behaves the same in foreground, background
-and away sessions.
+and away sessions. It mirrors the hook's own naming (see
+[Notes](#notes-and-limitations)): both lead the tab with the project.
+
+### Approve the writes once, for every session
+
+`~/.claudeview` sits outside your project, so Claude asks before writing there.
+Pre-approve it for **all** sessions by adding to `~/.claude/settings.json`
+(user scope applies to every project):
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Write(~/.claudeview/**)",
+      "Edit(~/.claudeview/**)"
+    ]
+  }
+}
+```
+
+`Write` and `Edit` are separate tools, so both rules are needed; `**` covers
+every file under the directory. If you point the viewer elsewhere with
+`CLAUDEVIEW_DIR`, match that path instead — a leading `//` denotes an absolute
+path, e.g. `Write(//mnt/nfs/claudeview/**)`.
 
 ## Start the viewer automatically on login
 
@@ -184,6 +210,7 @@ Hook environment variables (set on the machine running Claude Code):
 | `CLAUDEVIEW_DIR` | `~/.claudeview` | Directory the hook writes `<tab>.md` into (file-delivery mode). |
 | `CLAUDEVIEW_URL` | *(unset)* | If set, the hook `POST`s to `<url>/push` instead of writing a file (remote / home-lab). |
 | `CLAUDEVIEW_MIN_CHARS` | `200` | Floor for `last-message`; shorter final blocks are skipped. |
+| `CLAUDEVIEW_SID_CHARS` | `4` | Length of the session-id tail appended to the tab name so same-project sessions stay apart; `0` disables it. |
 | `CLAUDEVIEW_SETTLE` | `0.5` | Seconds `last-message` waits before reading the transcript, to let the turn's final block flush. `0` disables. |
 | `CLAUDEVIEW_LOG` | `~/.claudeview/.push.log` | Breadcrumb log each invocation's outcome is appended to. |
 
@@ -219,9 +246,13 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
 
 ## Notes and limitations
 
-- **Tabs are global, not per-session.** Every Claude Code session writes to the
-  same `WATCH_DIR`, so concurrent sessions share (and overwrite) the `plan` and
-  `last-message` tabs. Fine for solo use.
+- **Tabs are named per project and session.** The hook names each tab after the
+  session's project — the git repo directory (so a bare-repo + worktree layout
+  reports the repo, not the branch-named worktree), or `basename(cwd)` outside a
+  repo — plus a short session-id tail so two sessions in the *same* project do
+  not share a tab (`myproject-a3f9`, `myproject-a3f9-plan`). Set
+  `CLAUDEVIEW_SID_CHARS=0` to drop the tail. Manual `Write`s follow the same
+  convention by leading the filename with the project.
 - **`last-message` skips short turns** by design: a turn whose last text block is
   under `CLAUDEVIEW_MIN_CHARS` (or which emits no prose at all) produces no tab,
   so trivial acknowledgements never clobber the last long answer you were reading.
