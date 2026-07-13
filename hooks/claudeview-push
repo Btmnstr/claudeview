@@ -6,6 +6,13 @@
 #   claudeview-push plan          # PreToolUse, matcher = ExitPlanMode
 #   claudeview-push last-message  # Stop
 #
+# The tab is named after the session's project, so a viewer shared by several
+# sessions shows "ClaudeView", "otherproject", … instead of a single
+# "last-message" they all clobber. Plans get a "-plan" suffix so they sit beside
+# the wrap-up rather than overwriting it. The project is derived via git (so a
+# bare-repo + worktree layout reports the repo, not the branch-named worktree
+# dir), falling back to basename(.cwd) outside any git repo.
+#
 # Delivery target (optional — a sensible local default is used otherwise):
 #   CLAUDEVIEW_URL=http://host:4790   -> HTTP POST      (remote / home-lab)
 #   CLAUDEVIEW_DIR=/some/dir          -> write <tab>.md  (overrides the default)
@@ -18,14 +25,42 @@ set -euo pipefail
 mode="${1:-last-message}"
 payload="$(cat)"
 
+# The human name of a session's project. In a normal checkout that is the repo
+# directory; in a bare-repo + worktree layout basename(cwd) would be the branch
+# ("master"), so we ask git for the shared repo dir and name it from there:
+#   <repo>/.git      -> <repo>        (ordinary repo or its linked worktrees)
+#   <repo>.git       -> <repo>        (bare repo, and worktrees checked out of it)
+#   <project>/.bare  -> <project>     (the ".bare" worktree layout)
+# Outside any git repo, fall back to basename(cwd).
+project_name() {
+  local dir="${1:-$PWD}" common base
+  [ -n "$dir" ] || dir="$PWD"
+  if common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+    base="$(basename "$common")"
+    case "$base" in
+      .git|.bare) basename "$(dirname "$common")" ;;
+      *.git)      basename "$base" .git ;;
+      *)          printf '%s\n' "$base" ;;
+    esac
+  else
+    basename "${dir:-claude}"
+  fi
+}
+
+# Which session wrote this — reads far better than a session UUID, and gives
+# each project its own tab. Keep the result filesystem-safe.
+cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty')"
+project="$(project_name "$cwd")"
+project="${project//[^A-Za-z0-9_.-]/_}"
+
 case "$mode" in
   plan)
-    tab="plan"
+    tab="${project}-plan"
     md="$(printf '%s' "$payload" | jq -r '.tool_input.plan // empty')"
     ;;
 
   last-message)
-    tab="last-message"
+    tab="$project"
     # The Stop hook can fire while Claude Code is still flushing the turn's final
     # message to the transcript; read too early and we mirror the previous
     # (lead-in) block instead of the real answer. Settle briefly so the last
