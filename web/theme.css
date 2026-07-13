@@ -1,11 +1,44 @@
+/* ClaudeView theme — tuned for reading long-form Claude Code output.
+   Two palettes selected by a `data-theme` attribute on <html>; an inline
+   script in index.html sets it before first paint, so there is no flash. */
+
 :root {
-  --bg: #0f1115;
-  --panel: #161a22;
-  --fg: #e6e6e6;
-  --muted: #8b93a1;
-  --accent: #7aa2f7;
-  --border: #262b36;
-  --code-bg: #0b0d11;
+  color-scheme: light;
+
+  /* Warm paper — the book-like light mode. */
+  --bg:        #faf9f5;
+  --surface:   #f1efe8;
+  --fg:        #23232b;
+  --muted:     #63636c;
+  --accent:    #2f5fa0;
+  --on-accent: #ffffff;
+  --border:    #e4e0d6;
+  --code-bg:   #f3f1ea;
+
+  /* A system serif reads like a book with no web-font download. To go sans,
+     set --font-prose to the same stack as --font-ui. */
+  --font-prose: Charter, "Bitstream Charter", "Iowan Old Style",
+                "Palatino Linotype", Palatino, Georgia, serif;
+  --font-ui:    system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  --font-mono:  "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --measure: 68ch;     /* ~66 characters: the comfortable reading measure */
+  --font-size: 20px;
+  --line: 1.65;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Soft charcoal + soft off-white — avoids pure-black halation and glare. */
+  --bg:        #15171c;
+  --surface:   #1b1e25;
+  --fg:        #e4e2dc;
+  --muted:     #9aa0ab;
+  --accent:    #7aa2f7;
+  --on-accent: #15171c;
+  --border:    #282d38;
+  --code-bg:   #0e1014;
 }
 
 * {
@@ -17,9 +50,9 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
-  font-size: 20px;
-  line-height: 1.6;
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  line-height: var(--line);
 }
 
 .app {
@@ -28,7 +61,7 @@ html, body {
   height: 100vh;
 }
 
-/* Header: what the server is watching + connection status */
+/* Header: what the server is watching + connection status + theme toggle */
 
 .header {
   display: flex;
@@ -47,7 +80,7 @@ html, body {
 
 .header .watching {
   color: var(--muted);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -73,12 +106,31 @@ html, body {
 }
 
 .header .status.live {
-  color: #7ee787;
+  color: #4c9a5b;
   border-color: #2ea04326;
 }
 
+:root[data-theme="dark"] .header .status.live {
+  color: #7ee787;
+}
+
 .header .status.live::before {
-  background: #7ee787;
+  background: currentColor;
+}
+
+.header .theme-toggle {
+  font: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.header .theme-toggle:hover {
+  color: var(--fg);
 }
 
 /* Tab strip */
@@ -88,7 +140,7 @@ html, body {
   flex-wrap: wrap;
   gap: 6px;
   padding: 12px 16px;
-  background: var(--panel);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -104,18 +156,24 @@ html, body {
 }
 
 .tab.active {
-  color: var(--bg);
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
 
-/* Content pane */
+/* Content pane — the reading surface. Prose is capped to a comfortable
+   measure and centred; wide code and tables scroll within it. */
 
 .content {
-  display: block;
   flex: 1;
   overflow-y: auto;
-  padding: 32px 44px;
+  padding: 40px 44px 25vh;   /* deep bottom pad: the last line can rest mid-screen */
+  font-family: var(--font-prose);
+}
+
+.content > * {
+  max-width: var(--measure);
+  margin-inline: auto;
 }
 
 .content.empty {
@@ -123,30 +181,38 @@ html, body {
   align-items: center;
   justify-content: center;
   color: var(--muted);
+  font-family: var(--font-ui);
+}
+
+.content p {
+  margin: 0 auto 1.15em;
 }
 
 .content h1,
 .content h2,
 .content h3 {
+  font-family: var(--font-ui);
   line-height: 1.25;
+  margin: 1.8em auto 0.6em;   /* more space above than below: groups a heading with its text */
 }
 
 .content h1 {
-  font-size: 2em;
+  font-size: 1.9em;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.2em;
 }
 
 .content a {
   color: var(--accent);
+  text-underline-offset: 2px;
 }
 
 .content code {
   background: var(--code-bg);
   padding: 0.1em 0.35em;
   border-radius: 4px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.85em;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
 }
 
 .content pre {
@@ -155,15 +221,19 @@ html, body {
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
+  line-height: 1.5;
 }
 
 .content pre code {
   background: none;
   padding: 0;
+  font-size: 0.8em;
 }
 
 .content table {
   border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
 }
 
 .content th,
@@ -172,8 +242,12 @@ html, body {
   padding: 6px 12px;
 }
 
+.content th {
+  background: var(--surface);
+}
+
 .content blockquote {
-  margin: 0;
+  margin: 1.2em auto;
   padding-left: 16px;
   border-left: 3px solid var(--accent);
   color: var(--muted);
