@@ -28,7 +28,7 @@ defmodule Claudeview.Router do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(%{tabs: tabs, focus: focus}))
+    |> send_resp(200, Jason.encode!(%{tabs: tabs, focus: focus, watching: watching_paths()}))
   end
 
   get "/events" do
@@ -71,6 +71,13 @@ defmodule Claudeview.Router do
   end
 
   defp web_dir, do: System.get_env("WEB_DIR", "priv/web")
+
+  # Host-facing directories the server is watching. A list so the roadmap's
+  # "NFS mount + local dir" case is a one-line change. The container only knows
+  # /content, so a human-meaningful label is passed in via CLAUDEVIEW_LABEL.
+  defp watching_paths do
+    [System.get_env("CLAUDEVIEW_LABEL") || System.get_env("WATCH_DIR", "content")]
+  end
 
   defp content_type(path) do
     cond do

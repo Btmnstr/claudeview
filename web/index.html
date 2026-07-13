@@ -31,6 +31,12 @@
     events.onmessage = function (event) {
       app.ports.sseMessage.send(event.data);
     };
+    events.onopen = function () {
+      app.ports.sseStatus.send(true);
+    };
+    events.onerror = function () {
+      app.ports.sseStatus.send(false);
+    };
   </script>
 </body>
 </html>

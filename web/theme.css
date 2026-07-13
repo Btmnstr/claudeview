@@ -28,6 +28,59 @@ html, body {
   height: 100vh;
 }
 
+/* Header: what the server is watching + connection status */
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8em;
+}
+
+.header .brand {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.header .watching {
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header .status {
+  margin-left: auto;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.header .status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  vertical-align: middle;
+}
+
+.header .status.live {
+  color: #7ee787;
+  border-color: #2ea04326;
+}
+
+.header .status.live::before {
+  background: #7ee787;
+}
+
 /* Tab strip */
 
 .tabs {
