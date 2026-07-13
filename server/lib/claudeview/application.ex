@@ -6,7 +6,7 @@ defmodule Claudeview.Application do
 
   @impl true
   def start(_type, _args) do
-    port = env_int("PORT", 4000)
+    port = env_int("PORT", 4790)
     watch_dir = System.get_env("WATCH_DIR", "content")
     poll_ms = env_int("POLL_MS", 1000)
 
