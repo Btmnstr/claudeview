@@ -26,6 +26,12 @@ case "$mode" in
 
   last-message)
     tab="last-message"
+    # The Stop hook can fire while Claude Code is still flushing the turn's final
+    # message to the transcript; read too early and we mirror the previous
+    # (lead-in) block instead of the real answer. Settle briefly so the last
+    # block is on disk. This narrows the race but cannot close it — the
+    # file-write convention (see ~/.claude/CLAUDE.md) is the reliable path.
+    sleep "${CLAUDEVIEW_SETTLE:-0.5}"
     transcript="$(printf '%s' "$payload" | jq -r '.transcript_path // empty')"
     if [ -n "$transcript" ] && [ -f "$transcript" ]; then
       # The newest prose the assistant left on screen this turn — the wrap-up,
@@ -53,24 +59,45 @@ case "$mode" in
     ;;
 esac
 
+# Breadcrumb: record every invocation and its outcome, so a viewer that stays
+# dark is diagnosable with `tail ~/.claudeview/.push.log` instead of a hunt. The
+# name is dotted, so the watcher (which tracks only *.md) ignores it.
+log_file="${CLAUDEVIEW_LOG:-$HOME/.claudeview/.push.log}"
+log() {
+  mkdir -p "$(dirname "$log_file")" 2>/dev/null || true
+  printf '%s  mode=%-12s tab=%-12s chars=%-5s %s\n' \
+    "$(date +%FT%T%z)" "$mode" "$tab" "${#md}" "$1" >> "$log_file" 2>/dev/null || true
+}
+
 # Only mirror long-format text — skip trivial tails like "Done." Tune the floor
 # with CLAUDEVIEW_MIN_CHARS (~200 chars is a paragraph, "more than a few
 # sentences"). The plan mode always pushes; the floor applies to messages only.
 if [ "$mode" = "last-message" ]; then
   min="${CLAUDEVIEW_MIN_CHARS:-200}"
-  [ "${#md}" -lt "$min" ] && exit 0
+  if [ "${#md}" -lt "$min" ]; then
+    log "skip: below-min (${#md}<${min})"
+    exit 0
+  fi
 else
-  [ -z "${md:-}" ] && exit 0
+  if [ -z "${md:-}" ]; then
+    log "skip: empty"
+    exit 0
+  fi
 fi
 
 if [ -n "${CLAUDEVIEW_URL:-}" ]; then
-  printf '%s' "$md" \
-    | curl -sS -m 2 -X POST "${CLAUDEVIEW_URL%/}/push?tab=${tab}" --data-binary @- \
-      >/dev/null 2>&1 || true
+  if printf '%s' "$md" \
+       | curl -sS -m 2 -X POST "${CLAUDEVIEW_URL%/}/push?tab=${tab}" --data-binary @- \
+         >/dev/null 2>&1; then
+    log "posted -> ${CLAUDEVIEW_URL%/}/push?tab=${tab}"
+  else
+    log "post-failed -> ${CLAUDEVIEW_URL%/}"
+  fi
 else
   dir="${CLAUDEVIEW_DIR:-$HOME/.claudeview}"
   mkdir -p "$dir"
   printf '%s' "$md" > "${dir}/${tab}.md"
+  log "written -> ${dir}/${tab}.md"
 fi
 
 exit 0
