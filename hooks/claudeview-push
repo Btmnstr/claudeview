@@ -53,6 +53,17 @@ cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty')"
 project="$(project_name "$cwd")"
 project="${project//[^A-Za-z0-9_.-]/_}"
 
+# Two sessions in the *same* project would otherwise share one tab (e.g. two
+# worktrees of a bare repo both resolve to <repo>). A short slice of the session
+# id keeps them apart: "ClaudeView-a3f9". Set CLAUDEVIEW_SID_CHARS=0 to drop the
+# tail when you only ever run one session per project.
+sid="$(printf '%s' "$payload" | jq -r '.session_id // empty')"
+sid="${sid//-/}"
+sid_chars="${CLAUDEVIEW_SID_CHARS:-4}"
+if [ "$sid_chars" -gt 0 ] && [ -n "$sid" ]; then
+  project="${project}-${sid:0:$sid_chars}"
+fi
+
 case "$mode" in
   plan)
     tab="${project}-plan"
