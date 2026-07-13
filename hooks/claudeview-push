@@ -3,12 +3,13 @@
 # claudeview-push — mirror Claude Code output to the ClaudeView viewer.
 #
 # Claude Code hooks pass their event JSON on stdin. Pick what to show via arg:
-#   claudeview-push plan          # PostToolUse, matcher = ExitPlanMode
+#   claudeview-push plan          # PreToolUse, matcher = ExitPlanMode
 #   claudeview-push last-message  # Stop
 #
-# Delivery target (set exactly one in your environment):
-#   CLAUDEVIEW_URL=http://host:4000   -> HTTP POST         (remote / home-lab)
-#   CLAUDEVIEW_DIR=/path/to/content   -> write <tab>.md    (local, same machine)
+# Delivery target (optional — a sensible local default is used otherwise):
+#   CLAUDEVIEW_URL=http://host:4790   -> HTTP POST      (remote / home-lab)
+#   CLAUDEVIEW_DIR=/some/dir          -> write <tab>.md  (overrides the default)
+#   (neither set)                     -> write to $HOME/.claudeview
 #
 # Never blocks Claude: 2s curl timeout, always exits 0.
 
@@ -51,9 +52,10 @@ if [ -n "${CLAUDEVIEW_URL:-}" ]; then
   printf '%s' "$md" \
     | curl -sS -m 2 -X POST "${CLAUDEVIEW_URL%/}/push?tab=${tab}" --data-binary @- \
       >/dev/null 2>&1 || true
-elif [ -n "${CLAUDEVIEW_DIR:-}" ]; then
-  mkdir -p "$CLAUDEVIEW_DIR"
-  printf '%s' "$md" > "${CLAUDEVIEW_DIR}/${tab}.md"
+else
+  dir="${CLAUDEVIEW_DIR:-$HOME/.claudeview}"
+  mkdir -p "$dir"
+  printf '%s' "$md" > "${dir}/${tab}.md"
 fi
 
 exit 0

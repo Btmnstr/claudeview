@@ -5,9 +5,14 @@ services:
       # Host port is overridable; 4790 avoids the common 3000/4000 collisions.
       - "${CLAUDEVIEW_HOST_PORT:-4790}:4790"
     volumes:
-      - ./content:/content
+      # Shared with the hook's default. Resolved once at `up` time; persists
+      # across reboots (unlike /tmp), so it stays owned by you, not root.
+      - "${HOME}/.claudeview:/content"
     environment:
       WATCH_DIR: /content
+      # Host-facing path shown in the viewer's header (the container only ever
+      # sees /content, which is meaningless to a human).
+      CLAUDEVIEW_LABEL: "${HOME}/.claudeview"
       PORT: "4790"
       POLL_MS: "1000"
     restart: unless-stopped
