@@ -27,6 +27,7 @@ RUN mix deps.get --only prod && mix deps.compile
 COPY server/lib ./lib
 RUN mix compile
 COPY web/index.html web/theme.css ./priv/web/
+COPY web/JetBrainsMono-Regular.woff2 web/JetBrainsMono-Bold.woff2 ./priv/web/
 COPY --from=elm /web/elm.js ./priv/web/elm.js
 ENV WEB_DIR=/app/priv/web \
     WATCH_DIR=/content \

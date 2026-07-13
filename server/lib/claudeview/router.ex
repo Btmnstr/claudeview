@@ -84,6 +84,7 @@ defmodule Claudeview.Router do
       String.ends_with?(path, ".html") -> "text/html"
       String.ends_with?(path, ".js") -> "text/javascript"
       String.ends_with?(path, ".css") -> "text/css"
+      String.ends_with?(path, ".woff2") -> "font/woff2"
       true -> "application/octet-stream"
     end
   end

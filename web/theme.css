@@ -2,6 +2,24 @@
    Two palettes selected by a `data-theme` attribute on <html>; an inline
    script in index.html sets it before first paint, so there is no flash. */
 
+/* JetBrains Mono, self-hosted (SIL OFL) — the same coding font as the editor,
+   with its operator ligatures. Two weights cover code and its bold. */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
 
@@ -213,6 +231,9 @@ html, body {
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 0.82em;
+  /* JetBrains Mono's operator ligatures (->, =>, !=, ===, <=, |> …). */
+  font-variant-ligatures: contextual;
+  font-feature-settings: "calt" 1, "liga" 1;
 }
 
 .content pre {
