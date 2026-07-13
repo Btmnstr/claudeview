@@ -29,6 +29,9 @@ port sseMessage : (String -> msg) -> Sub msg
 port sseStatus : (Bool -> msg) -> Sub msg
 
 
+port setTheme : String -> Cmd msg
+
+
 
 -- MODEL
 
@@ -42,12 +45,15 @@ type alias Model =
     , focus : Maybe String
     , watching : List String
     , connected : Bool
+    , theme : String
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False }, fetchContent )
+{-| The flag is the theme JS resolved before first paint ("light" or "dark").
+-}
+init : String -> ( Model, Cmd Msg )
+init theme =
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme }, fetchContent )
 
 
 
@@ -63,6 +69,7 @@ type Msg
     | Status Bool
     | GotContent (Result Http.Error Content)
     | Focus String
+    | ToggleTheme
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -82,6 +89,17 @@ update msg model =
 
         Focus name ->
             ( { model | focus = Just name }, Cmd.none )
+
+        ToggleTheme ->
+            let
+                next =
+                    if model.theme == "dark" then
+                        "light"
+
+                    else
+                        "dark"
+            in
+            ( { model | theme = next }, setTheme next )
 
 
 fetchContent : Cmd Msg
@@ -131,6 +149,15 @@ header model =
 
                  else
                     "offline"
+                )
+            ]
+        , button [ class "theme-toggle", onClick ToggleTheme ]
+            [ text
+                (if model.theme == "dark" then
+                    "☀ light"
+
+                 else
+                    "☾ dark"
                 )
             ]
         ]
@@ -187,7 +214,7 @@ subscriptions _ =
     Sub.batch [ sseMessage Ping, sseStatus Status ]
 
 
-main : Program () Model Msg
+main : Program String Model Msg
 main =
     Browser.element
         { init = init

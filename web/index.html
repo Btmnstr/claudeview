@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ClaudeView</title>
+  <script>
+    // Resolve the theme before first paint so there is no light/dark flash:
+    // a saved manual choice wins, otherwise follow the OS preference.
+    (function () {
+      var saved = localStorage.getItem("claudeview-theme");
+      var dark = saved ? saved === "dark"
+                       : matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
   <link rel="stylesheet" href="/assets/theme.css">
 </head>
 <body>
@@ -24,7 +34,15 @@
       }
     });
 
-    var app = Elm.Main.init({ node: document.getElementById("app") });
+    // Hand the resolved theme to Elm as a flag; Elm owns the toggle button and
+    // asks us back (via the setTheme port) to apply and remember a new choice.
+    var theme = document.documentElement.getAttribute("data-theme");
+    var app = Elm.Main.init({ node: document.getElementById("app"), flags: theme });
+
+    app.ports.setTheme.subscribe(function (t) {
+      document.documentElement.setAttribute("data-theme", t);
+      localStorage.setItem("claudeview-theme", t);
+    });
 
     // EventSource reconnects on its own, so a server restart self-heals.
     var events = new EventSource("/events");
