@@ -99,8 +99,12 @@ two absolute paths to point at your checkout. It wires:
   moment Claude presents it, **before** you approve, so you review it on the big
   screen while deciding. (`PostToolUse` would fire only *after* approval — too
   late.)
-- **`Stop`** → `claudeview-push last-message` — mirrors the final assistant
-  message of every turn (research, reviews, analysis — anything long).
+- **`Stop`** → `claudeview-push last-message` — mirrors the last block of prose
+  Claude leaves on screen at the end of a turn (research, reviews, analysis —
+  anything long). A turn almost always *ends* with a tool call, so the hook takes
+  the last **text** block of the turn, not the last message. Trivial tails like
+  "Done." are skipped: only messages of at least `CLAUDEVIEW_MIN_CHARS`
+  characters (default `200`, roughly a paragraph) are mirrored.
 
 By default the hook writes to **`~/.claudeview`** — the same directory the
 container watches — so no environment variable is required. To send elsewhere,
@@ -164,7 +168,8 @@ The prototype runs locally, but nothing is local-only:
 | `WEB_DIR` | `priv/web` | Where `index.html` / `elm.js` / `theme.css` are served from. |
 
 Hook / launcher environment variables (`CLAUDEVIEW_DIR`, `CLAUDEVIEW_URL`,
-`CLAUDEVIEW_POS`, `CLAUDEVIEW_PROFILE`) are documented in their sections above.
+`CLAUDEVIEW_MIN_CHARS`, `CLAUDEVIEW_POS`, `CLAUDEVIEW_PROFILE`) are documented in
+their sections above.
 
 ## Endpoints
 
@@ -193,9 +198,9 @@ Hook / launcher environment variables (`CLAUDEVIEW_DIR`, `CLAUDEVIEW_URL`,
 - **Tabs are global, not per-session.** Every Claude Code session writes to the
   same `WATCH_DIR`, so concurrent sessions share (and overwrite) the `plan` and
   `last-message` tabs. Fine for solo use.
-- **`last-message` skips tool-ending turns** by design: a turn whose final
-  assistant message is a tool call (no trailing text) produces no tab, to avoid
-  blank tabs.
+- **`last-message` skips short turns** by design: a turn whose last text block is
+  under `CLAUDEVIEW_MIN_CHARS` (or which emits no prose at all) produces no tab,
+  so trivial acknowledgements never clobber the last long answer you were reading.
 - Rendering treats content as trusted (local files / your own Claude sessions).
   For untrusted input, enable `cmark-gfm`'s `tagfilter` extension in
   `server/lib/claudeview/render.ex`.

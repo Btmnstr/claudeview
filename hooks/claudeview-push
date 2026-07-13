@@ -28,13 +28,20 @@ case "$mode" in
     tab="last-message"
     transcript="$(printf '%s' "$payload" | jq -r '.transcript_path // empty')"
     if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-      # Transcript is JSONL; take the text of the last assistant message.
+      # The newest prose the assistant left on screen this turn — the wrap-up,
+      # findings or review. A turn's final entry is almost always a tool_use, so
+      # we can't take the last *message* (that skips every tool-ending turn, i.e.
+      # nearly all of them). We take the last *text* block since the most recent
+      # genuine user prompt: real prompts have string content, whereas tool
+      # results are user entries with array content.
       md="$(jq -rs '
-        map(select(.type == "assistant"))
-        | last
-        | .message.content
-        | map(select(.type == "text") | .text)
-        | join("\n")
+        ( [ range(0; length) as $i
+            | select(.[$i].type == "user" and (.[$i].message.content | type == "string"))
+            | $i ] | last ) as $start
+        | .[$start + 1:]
+        | map(select(.type == "assistant") | .message.content[]
+              | select(.type == "text") | .text)
+        | last // ""
       ' "$transcript" 2>/dev/null || true)"
     else
       md=""
@@ -46,7 +53,15 @@ case "$mode" in
     ;;
 esac
 
-[ -z "${md:-}" ] && exit 0
+# Only mirror long-format text — skip trivial tails like "Done." Tune the floor
+# with CLAUDEVIEW_MIN_CHARS (~200 chars is a paragraph, "more than a few
+# sentences"). The plan mode always pushes; the floor applies to messages only.
+if [ "$mode" = "last-message" ]; then
+  min="${CLAUDEVIEW_MIN_CHARS:-200}"
+  [ "${#md}" -lt "$min" ] && exit 0
+else
+  [ -z "${md:-}" ] && exit 0
+fi
 
 if [ -n "${CLAUDEVIEW_URL:-}" ]; then
   printf '%s' "$md" \
