@@ -10,6 +10,8 @@ stays the place you interact; the viewer is where you read.
 No MCP and no interactivity: content reaches the viewer automatically via Claude
 Code hooks, **plus** a "Claude opens a tab by writing a file" convention.
 
+![The ClaudeView viewer on a portrait monitor beside the editor](screenshot.webp)
+
 ## How it works
 
 ```
