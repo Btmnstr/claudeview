@@ -51,8 +51,13 @@ Three ideas keep it small:
 ```sh
 git clone <this-repo> ClaudeView
 cd ClaudeView
+mkdir -p ~/.claudeview                 # the watched dir; create it as you, not root
 docker compose up --build -d
 ```
+
+The container watches **`~/.claudeview`** (the default the hook writes to as well).
+Creating it yourself first keeps it owned by you — otherwise Docker creates the
+bind-mount path as `root` and the hook can't write to it.
 
 The viewer listens on **port 4790** by default (chosen to dodge the usual
 3000/4000 collisions). Override the host port with `CLAUDEVIEW_HOST_PORT`, e.g.
@@ -64,10 +69,11 @@ Open the viewer as a dedicated, chromeless, full-screen window:
 bin/claudeview-open
 ```
 
-Prove it works without Claude:
+The viewer's header shows which directory it is watching and whether the live
+connection is up. Prove it works without Claude:
 
 ```sh
-echo "# Hello" > content/scratch.md                 # a 'scratch' tab appears
+echo "# Hello" > ~/.claudeview/scratch.md            # a 'scratch' tab appears
 curl -X POST 'http://localhost:4790/push?tab=note' \
      --data-binary '# Pushed over HTTP'              # a 'note' tab appears
 ```
@@ -86,41 +92,34 @@ wlr-randr --output DP-0 --transform 90    # Wayland (wlroots)
 
 ## Wire up the hooks
 
-The hook script (`hooks/claudeview-push`) delivers content one of two ways,
-chosen by environment:
+Merge `hooks/settings.snippet.json` into `~/.claude/settings.json`, editing the
+two absolute paths to point at your checkout. It wires:
 
-- `CLAUDEVIEW_DIR=/path/to/ClaudeView/content` — write `<tab>.md` directly (local).
-- `CLAUDEVIEW_URL=http://host:4790` — HTTP `POST` (remote / home-lab).
-
-Set one so Claude Code inherits it — either in your shell profile, or in the
-`env` block of `~/.claude/settings.json`:
-
-```json
-{
-  "env": {
-    "CLAUDEVIEW_DIR": "/path/to/ClaudeView/content"
-  }
-}
-```
-
-Then merge `hooks/settings.snippet.json` into `~/.claude/settings.json`, editing
-the two absolute paths to point at your checkout. It wires:
-
+- **`PreToolUse` / `ExitPlanMode`** → `claudeview-push plan` — mirrors a plan the
+  moment Claude presents it, **before** you approve, so you review it on the big
+  screen while deciding. (`PostToolUse` would fire only *after* approval — too
+  late.)
 - **`Stop`** → `claudeview-push last-message` — mirrors the final assistant
   message of every turn (research, reviews, analysis — anything long).
-- **`PostToolUse` / `ExitPlanMode`** → `claudeview-push plan` — mirrors a plan the
-  moment it is presented.
+
+By default the hook writes to **`~/.claudeview`** — the same directory the
+container watches — so no environment variable is required. To send elsewhere,
+set one of:
+
+- `CLAUDEVIEW_DIR=/some/dir` — write `<tab>.md` there instead (also update the
+  compose mount if you want the server to watch it).
+- `CLAUDEVIEW_URL=http://host:4790` — HTTP `POST` (remote / home-lab).
 
 The script uses a 2-second curl timeout and always exits 0, so a viewer that is
-down never blocks Claude. Hooks and `env` are read at session start, so open a
-**new** Claude Code session for them to take effect.
+down never blocks Claude. Hooks are read at session start, so open a **new**
+Claude Code session for them to take effect.
 
 ## Let Claude open a tab on purpose
 
 Add a line like this to your project `CLAUDE.md`:
 
 > To display something on the ClaudeView viewer, write it to
-> `content/<short-name>.md` (kebab-case). Each file is a tab.
+> `~/.claudeview/<short-name>.md` (kebab-case). Each file is a tab.
 
 Claude then curates the viewer with the ordinary `Write` tool — no MCP.
 
@@ -159,7 +158,8 @@ The prototype runs locally, but nothing is local-only:
 |---|---|---|
 | `PORT` | `4790` | HTTP port the server listens on (inside the container). |
 | `CLAUDEVIEW_HOST_PORT` | `4790` | Host port `docker compose` publishes the viewer on. |
-| `WATCH_DIR` | `content` | Directory the watcher polls; `POST /push` writes here. |
+| `WATCH_DIR` | `content` | Directory the watcher polls; `POST /push` writes here. Compose sets it to `/content` (the mount of `~/.claudeview`). |
+| `CLAUDEVIEW_LABEL` | value of `WATCH_DIR` | Host-facing path shown in the viewer's header (the container only sees `/content`). |
 | `POLL_MS` | `1000` | Poll interval in milliseconds. |
 | `WEB_DIR` | `priv/web` | Where `index.html` / `elm.js` / `theme.css` are served from. |
 
@@ -173,7 +173,7 @@ Hook / launcher environment variables (`CLAUDEVIEW_DIR`, `CLAUDEVIEW_URL`,
 | `GET` | `/` | The Elm viewer. |
 | `GET` | `/assets/<name>` | Static assets (`elm.js`, `theme.css`). |
 | `GET` | `/events` | SSE stream; emits `data: changed` on any content change (and once on connect). |
-| `GET` | `/content` | JSON snapshot: `{tabs: [{name, html, mtime}], focus}`. |
+| `GET` | `/content` | JSON snapshot: `{tabs: [{name, html, mtime}], focus, watching: [dir, …]}`. |
 | `POST` | `/push?tab=<name>` | Write the request body to `<name>.md` in `WATCH_DIR`. |
 
 ## Project layout
@@ -185,7 +185,7 @@ Hook / launcher environment variables (`CLAUDEVIEW_DIR`, `CLAUDEVIEW_URL`,
 | `hooks/claudeview-push` | Bash + jq + curl. Mirrors plans / final answers to the viewer. |
 | `hooks/settings.snippet.json` | Hook wiring to merge into `~/.claude/settings.json`. |
 | `bin/claudeview-open` | Opens the viewer as a dedicated, full-screen browser window. |
-| `content/` | The `WATCH_DIR`. Drop/POST `.md` files here; each becomes a tab. |
+| `content/welcome.md` | Seed tab; copy it into `~/.claudeview` on first run. The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
 | `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm). |
 
 ## Notes and limitations
