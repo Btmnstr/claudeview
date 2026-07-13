@@ -273,3 +273,52 @@ html, body {
   border-left: 3px solid var(--accent);
   color: var(--muted);
 }
+
+/* Syntax highlighting. chroma wraps tokens in <span class="k|s|c…"> inside
+   <pre class="chroma">; these rules colour them. One rule set serves both
+   themes because the colours are variables — light in :root, dark below. */
+
+:root {
+  --hl-comment:  #6a737d;
+  --hl-keyword:  #d73a49;
+  --hl-string:   #032f62;
+  --hl-number:   #005cc5;
+  --hl-function: #6f42c1;
+  --hl-type:     #e36209;
+  --hl-builtin:  #005cc5;
+  --hl-tag:      #22863a;
+  --hl-attr:     #6f42c1;
+}
+
+:root[data-theme="dark"] {
+  --hl-comment:  #8b949e;
+  --hl-keyword:  #ff7b72;
+  --hl-string:   #a5d6ff;
+  --hl-number:   #79c0ff;
+  --hl-function: #d2a8ff;
+  --hl-type:     #ffa657;
+  --hl-builtin:  #79c0ff;
+  --hl-tag:      #7ee787;
+  --hl-attr:     #d2a8ff;
+}
+
+.chroma .c, .chroma .ch, .chroma .cm, .chroma .cp, .chroma .cpf,
+.chroma .c1, .chroma .cs { color: var(--hl-comment); font-style: italic; }
+
+.chroma .k, .chroma .kc, .chroma .kd, .chroma .kn, .chroma .kp,
+.chroma .kr, .chroma .ow { color: var(--hl-keyword); }
+
+.chroma .kt { color: var(--hl-type); }
+
+.chroma .s, .chroma .sa, .chroma .sb, .chroma .sc, .chroma .dl, .chroma .sd,
+.chroma .s2, .chroma .se, .chroma .sh, .chroma .si, .chroma .sx, .chroma .sr,
+.chroma .s1, .chroma .ss { color: var(--hl-string); }
+
+.chroma .m, .chroma .mb, .chroma .mf, .chroma .mh, .chroma .mi,
+.chroma .il, .chroma .mo { color: var(--hl-number); }
+
+.chroma .nf, .chroma .fm { color: var(--hl-function); }
+.chroma .nc, .chroma .nn { color: var(--hl-type); }
+.chroma .nb, .chroma .bp { color: var(--hl-builtin); }
+.chroma .nt { color: var(--hl-tag); }
+.chroma .na, .chroma .nd { color: var(--hl-attr); }

@@ -16,8 +16,16 @@ RUN elm make src/Main.elm --optimize --output=elm.js
 # Debian-based image: cmark-gfm (GFM tables etc.) is packaged there, not on Alpine.
 FROM elixir:1.16 AS app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends cmark-gfm \
+    && apt-get install -y --no-install-recommends cmark-gfm curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# chroma — a single static Go binary for syntax highlighting, pinned and fetched
+# like the Elm compiler (a build tool, so downloaded rather than vendored).
+RUN curl -fsSL https://github.com/alecthomas/chroma/releases/download/v2.14.0/chroma-2.14.0-linux-amd64.tar.gz \
+      -o /tmp/chroma.tgz \
+    && tar -xzf /tmp/chroma.tgz -C /usr/local/bin chroma \
+    && rm /tmp/chroma.tgz \
+    && chroma --version
 WORKDIR /app
 ENV MIX_ENV=prod
 RUN mix local.hex --force && mix local.rebar --force
