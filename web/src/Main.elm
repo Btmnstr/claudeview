@@ -339,7 +339,13 @@ contentPane model =
         t :: _ ->
             -- `<raw-html>` is a custom element (see index.html) that renders the
             -- server-produced HTML string, keeping this Elm code free of markdown.
-            node "raw-html" [ class "content", property "content" (E.string t.html) ] []
+            -- `docName` names the document so the element can remember its scroll.
+            node "raw-html"
+                [ class "content"
+                , property "docName" (E.string t.name)
+                , property "content" (E.string t.html)
+                ]
+                []
 
         [] ->
             div [ class "content empty" ]

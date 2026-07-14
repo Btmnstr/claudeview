@@ -20,17 +20,45 @@
   <div id="app"></div>
   <script src="/assets/elm.js"></script>
   <script>
-    // Renders a server-produced HTML string. Elm sets the `content` property;
-    // the setter mirrors it into the DOM. Kept trivial on purpose.
+    // Renders a server-produced HTML string. Elm sets `docName` (which document)
+    // and `content` (its HTML). The element remembers each document's scroll
+    // position for the life of the page, so switching tabs and coming back lands
+    // you where you left off. Positions live in a per-instance Map; because Elm
+    // reuses this one element across every switch, the Map survives with it.
     customElements.define("raw-html", class extends HTMLElement {
-      set content(value) {
-        if (this._content !== value) {
-          this._content = value;
-          this.innerHTML = value;
-        }
+      constructor() {
+        super();
+        this._scrolls = new Map();   // doc name -> scrollTop, this session only
+        this._doc = null;
+        // Continuously record the displayed document's position, so the outgoing
+        // one is already saved by the time we switch away.
+        this.addEventListener("scroll", () => {
+          if (this._doc !== null) this._scrolls.set(this._doc, this.scrollTop);
+        });
       }
-      get content() {
-        return this._content;
+
+      set docName(value) { this._nextDoc = value; this._schedule(); }
+      set content(value) { this._nextHtml = value; this._schedule(); }
+      get content() { return this._content; }
+
+      // Elm sets docName and content in the same DOM patch; coalesce them into a
+      // single apply so restore runs once, after both are set — order-independent.
+      _schedule() {
+        if (this._queued) return;
+        this._queued = true;
+        queueMicrotask(() => {
+          this._queued = false;
+          if (this._nextHtml !== this._content) {
+            this._content = this._nextHtml;
+            this.innerHTML = this._content;
+          }
+          // Restore only on a real switch; a same-doc content update (an SSE
+          // rewrite of the doc you're reading) keeps its position, not top.
+          if (this._nextDoc !== this._doc) {
+            this._doc = this._nextDoc;
+            this.scrollTop = this._scrolls.get(this._doc) || 0;
+          }
+        });
       }
     });
 
