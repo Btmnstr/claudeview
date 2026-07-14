@@ -82,6 +82,7 @@ html, body {
 /* Header: what the server is watching + connection status + theme toggle */
 
 .header {
+  position: relative;   /* anchors the absolutely-centred document title */
   display: flex;
   align-items: baseline;
   gap: 14px;
@@ -89,6 +90,20 @@ html, body {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   font-size: 0.8em;
+}
+
+/* The document currently on screen, centred independently of the side groups so
+   uneven left/right widths never shift it off-centre. */
+.header .doc-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 40%;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header .brand {
@@ -177,6 +192,84 @@ html, body {
   color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* Split-button: the group label (`.tab`) and its dropdown caret (`.tab-caret`)
+   read as one control, so their touching corners are squared off. */
+
+.tab-group {
+  position: relative;
+  display: inline-flex;
+}
+
+.tab-group .tab:has(+ .tab-caret) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.tab-caret {
+  font: inherit;
+  font-size: 0.7em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.tab-caret:hover {
+  color: var(--fg);
+}
+
+/* Dropdown of a group's documents, newest-first. */
+
+.tab-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  margin-top: 4px;
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px #0003;
+  overflow: hidden;
+}
+
+.tab-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  font: inherit;
+  font-size: 0.8em;
+  color: var(--fg);
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.tab-menu-item:hover {
+  background: var(--bg);
+}
+
+.tab-menu-item .ago {
+  color: var(--muted);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* Invisible catch-all beneath an open menu: a click off the menu closes it. */
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
 }
 
 /* Content pane — the reading surface. Prose is capped to a comfortable

@@ -7,17 +7,26 @@ tabs, already rendered to HTML by the server, plus the directories being watched
 and shows the tab the server marks as focused — the most recently modified one.
 Clicking a tab pins it until the next content change.
 
-A slim header shows what the server is watching and whether the live connection
-is up, so an empty screen still tells you where to look.
+Tabs share a naming convention (`<project>-<sid>[-<type>]`), so the viewer folds
+them into one split-button per project: the button jumps to that project's newest
+document, and a dropdown reaches the older ones. The first `-`-delimited segment
+is the group key.
+
+A slim header shows what the server is watching, the document on screen, and
+whether the live connection is up, so an empty screen still tells you where to look.
 -}
 
 import Browser
+import Dict
 import Html exposing (Html, button, div, node, span, text)
 import Html.Attributes exposing (class, classList, property)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as D
 import Json.Encode as E
+import Task
+import Time
+
 
 
 -- PORTS
@@ -46,6 +55,8 @@ type alias Model =
     , watching : List String
     , connected : Bool
     , theme : String
+    , openGroup : Maybe String -- the group whose dropdown is open, if any
+    , now : Int -- POSIX seconds, so the dropdown can say "2h ago"
     }
 
 
@@ -53,7 +64,9 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme }, fetchContent )
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0 }
+    , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
+    )
 
 
 
@@ -69,6 +82,9 @@ type Msg
     | Status Bool
     | GotContent (Result Http.Error Content)
     | Focus String
+    | ToggleGroup String
+    | CloseMenu
+    | Tick Time.Posix
     | ToggleTheme
 
 
@@ -88,7 +104,17 @@ update msg model =
             ( model, Cmd.none )
 
         Focus name ->
-            ( { model | focus = Just name }, Cmd.none )
+            -- Selecting a document (button or dropdown item) also closes the menu.
+            ( { model | focus = Just name, openGroup = Nothing }, Cmd.none )
+
+        ToggleGroup key ->
+            ( { model | openGroup = toggle key model.openGroup }, Cmd.none )
+
+        CloseMenu ->
+            ( { model | openGroup = Nothing }, Cmd.none )
+
+        Tick posix ->
+            ( { model | now = Time.posixToMillis posix // 1000 }, Cmd.none )
 
         ToggleTheme ->
             let
@@ -100,6 +126,15 @@ update msg model =
                         "dark"
             in
             ( { model | theme = next }, setTheme next )
+
+
+toggle : String -> Maybe String -> Maybe String
+toggle key open =
+    if open == Just key then
+        Nothing
+
+    else
+        Just key
 
 
 fetchContent : Cmd Msg
@@ -124,6 +159,70 @@ tabDecoder =
 
 
 
+-- GROUPING
+
+
+type alias Group =
+    { key : String, tabs : List Tab } -- tabs newest-first
+
+
+{-| The project a tab belongs to: everything before the first hyphen.
+-}
+groupKey : String -> String
+groupKey name =
+    name |> String.split "-" |> List.head |> Maybe.withDefault name
+
+
+{-| Fold the flat tab list into alphabetical groups (a `Dict` orders its keys),
+each group's documents sorted newest-first so the head is the one to jump to.
+-}
+toGroups : List Tab -> List Group
+toGroups tabs =
+    tabs
+        |> List.foldl
+            (\t -> Dict.update (groupKey t.name) (\members -> Just (t :: Maybe.withDefault [] members)))
+            Dict.empty
+        |> Dict.toList
+        |> List.map (\( key, members ) -> { key = key, tabs = List.sortBy (\t -> negate t.mtime) members })
+
+
+{-| The label for a dropdown entry: the document type after the project prefix
+(`plan`, `research-tabs`), or the whole name when there is no suffix.
+-}
+docLabel : String -> String
+docLabel name =
+    case String.split "-" name of
+        _ :: rest ->
+            if List.isEmpty rest then
+                name
+
+            else
+                String.join "-" rest
+
+        [] ->
+            name
+
+
+relative : Int -> Int -> String
+relative now mtime =
+    let
+        secs =
+            max 0 (now - mtime)
+    in
+    if secs < 60 then
+        "just now"
+
+    else if secs < 3600 then
+        String.fromInt (secs // 60) ++ "m ago"
+
+    else if secs < 86400 then
+        String.fromInt (secs // 3600) ++ "h ago"
+
+    else
+        String.fromInt (secs // 86400) ++ "d ago"
+
+
+
 -- VIEW
 
 
@@ -131,7 +230,8 @@ view : Model -> Html Msg
 view model =
     div [ class "app" ]
         [ header model
-        , div [ class "tabs" ] (List.map (tab model.focus) model.tabs)
+        , backdrop model.openGroup
+        , div [ class "tabs" ] (List.map (groupView model) (toGroups model.tabs))
         , contentPane model
         ]
 
@@ -141,6 +241,7 @@ header model =
     div [ class "header" ]
         [ span [ class "brand" ] [ text "ClaudeView" ]
         , span [ class "watching" ] [ text (watchingLabel model.watching) ]
+        , span [ class "doc-title" ] [ text (Maybe.withDefault "" model.focus) ]
         , span
             [ classList [ ( "status", True ), ( "live", model.connected ) ] ]
             [ text
@@ -173,13 +274,60 @@ watchingLabel dirs =
             "watching: " ++ String.join ", " dirs
 
 
-tab : Maybe String -> Tab -> Html Msg
-tab focus t =
-    button
-        [ classList [ ( "tab", True ), ( "active", focus == Just t.name ) ]
-        , onClick (Focus t.name)
+{-| A group is a split-button: the label jumps to the newest document, the caret
+opens a dropdown of the rest. The caret and menu appear only when there is more
+than one document to choose between.
+-}
+groupView : Model -> Group -> Html Msg
+groupView model g =
+    let
+        newest =
+            List.head g.tabs
+
+        isActive =
+            Maybe.map groupKey model.focus == Just g.key
+
+        multi =
+            List.length g.tabs > 1
+    in
+    div [ class "tab-group" ]
+        [ button
+            [ classList [ ( "tab", True ), ( "active", isActive ) ]
+            , onClick (Focus (Maybe.withDefault g.key (Maybe.map .name newest)))
+            ]
+            [ text g.key ]
+        , if multi then
+            button [ class "tab-caret", onClick (ToggleGroup g.key) ] [ text "▾" ]
+
+          else
+            text ""
+        , if multi && model.openGroup == Just g.key then
+            div [ class "tab-menu" ] (List.map (menuItem model.now) g.tabs)
+
+          else
+            text ""
         ]
-        [ text t.name ]
+
+
+menuItem : Int -> Tab -> Html Msg
+menuItem now t =
+    button [ class "tab-menu-item", onClick (Focus t.name) ]
+        [ span [ class "doc" ] [ text (docLabel t.name) ]
+        , span [ class "ago" ] [ text (relative now t.mtime) ]
+        ]
+
+
+{-| An invisible full-window layer under any open menu: a click anywhere off the
+menu lands here and closes it.
+-}
+backdrop : Maybe String -> Html Msg
+backdrop open =
+    case open of
+        Just _ ->
+            div [ class "menu-backdrop", onClick CloseMenu ] []
+
+        Nothing ->
+            text ""
 
 
 contentPane : Model -> Html Msg
@@ -211,7 +359,11 @@ emptyMessage dirs =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [ sseMessage Ping, sseStatus Status ]
+    Sub.batch
+        [ sseMessage Ping
+        , sseStatus Status
+        , Time.every 60000 Tick
+        ]
 
 
 main : Program String Model Msg
