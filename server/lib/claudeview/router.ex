@@ -14,6 +14,22 @@ defmodule Claudeview.Router do
     serve(conn, name)
   end
 
+  # Images an author dropped beside their .md, referenced as ![alt](name.png).
+  # Served from the watch dir; safe_name/1 collapses to a basename, so a request
+  # can never escape it (flat layout — images live directly in the watch dir).
+  get "/media/:name" do
+    dir = System.get_env("WATCH_DIR", "content")
+    path = Path.join(dir, safe_name(name))
+
+    if File.exists?(path) do
+      conn
+      |> put_resp_content_type(content_type(path))
+      |> send_file(200, path)
+    else
+      send_resp(conn, 404, "not found\n")
+    end
+  end
+
   get "/content" do
     tabs =
       Claudeview.Store.snapshot()
@@ -79,14 +95,22 @@ defmodule Claudeview.Router do
     [System.get_env("CLAUDEVIEW_LABEL") || System.get_env("WATCH_DIR", "content")]
   end
 
+  @content_types %{
+    ".html" => "text/html",
+    ".js" => "text/javascript",
+    ".css" => "text/css",
+    ".woff2" => "font/woff2",
+    ".png" => "image/png",
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".gif" => "image/gif",
+    ".webp" => "image/webp",
+    ".svg" => "image/svg+xml"
+  }
+
   defp content_type(path) do
-    cond do
-      String.ends_with?(path, ".html") -> "text/html"
-      String.ends_with?(path, ".js") -> "text/javascript"
-      String.ends_with?(path, ".css") -> "text/css"
-      String.ends_with?(path, ".woff2") -> "font/woff2"
-      true -> "application/octet-stream"
-    end
+    ext = path |> Path.extname() |> String.downcase()
+    Map.get(@content_types, ext, "application/octet-stream")
   end
 
   defp safe_name(name) do

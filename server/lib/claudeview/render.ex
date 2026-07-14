@@ -45,16 +45,22 @@ defmodule Claudeview.Render do
 
   @code_block ~r|<pre><code class="language-([^"]+)">(.*?)</code></pre>|s
 
+  # A relative Markdown image (not http(s), not a data: URI, not already rooted)
+  # points at a file the author dropped beside the .md; route it through /media.
+  @img_src ~r/(<img[^>]+\bsrc=")(?!https?:|data:|\/)([^"]+)(")/i
+
   def to_html(path) do
     args = Enum.flat_map(@extensions, &["-e", &1]) ++ [path]
 
     case System.cmd("cmark-gfm", args) do
-      {html, 0} -> render_blocks(html)
+      {html, 0} -> html |> route_images() |> render_blocks()
       {err, _} -> "<pre>cmark-gfm failed:\n#{err}</pre>"
     end
   rescue
     _ -> "<pre>cmark-gfm is not installed on the server.</pre>"
   end
+
+  defp route_images(html), do: Regex.replace(@img_src, html, "\\1/media/\\2\\3")
 
   # Replace each fenced block with its rendered form, or keep it verbatim when no
   # renderer matches or a renderer returns nil (a failure is never load-bearing).
