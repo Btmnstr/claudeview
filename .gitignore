@@ -11,3 +11,6 @@ web/elm.js
 
 # Local, machine-specific Claude Code permissions.
 .claude/settings.local.json
+
+# Downloaded code-quality tools (fetched by `make tools`).
+.tools/

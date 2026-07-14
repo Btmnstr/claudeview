@@ -1,6 +1,8 @@
 services:
   claudeview:
-    build: .
+    build:
+      context: .
+      target: app
     ports:
       # Host port is overridable; 4790 avoids the common 3000/4000 collisions.
       - "${CLAUDEVIEW_HOST_PORT:-4790}:4790"
@@ -16,3 +18,16 @@ services:
       PORT: "4790"
       POLL_MS: "1000"
     restart: unless-stopped
+
+  # The code-quality toolchain (make check / make format). Under the "dev"
+  # profile so `docker compose up` never starts it; the Makefile invokes it via
+  # `docker compose run`. The working tree is mounted so formatters write back to
+  # the host and checks see uncommitted changes.
+  tools:
+    build:
+      context: .
+      target: tools
+    volumes:
+      - ".:/work"
+    working_dir: /work
+    profiles: ["dev"]

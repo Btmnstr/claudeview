@@ -43,3 +43,29 @@ ENV WEB_DIR=/app/priv/web \
     POLL_MS=1000
 EXPOSE 4790
 CMD ["mix", "run", "--no-halt"]
+
+# Stage 3 — the code-quality toolchain. `make check` runs the checks inside this
+# image, so every machine uses the exact same pinned tool versions regardless of
+# what (if anything) is installed on the host. elixir:1.16 gives us mix (format,
+# compile, Credo); the three formatters/linters are fetched as single pinned
+# binaries, exactly like the Elm compiler and chroma above.
+FROM elixir:1.16 AS tools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates xz-utils make git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://github.com/elm/compiler/releases/download/0.19.1/binary-for-linux-64-bit.gz \
+      -o /tmp/elm.gz \
+    && gunzip /tmp/elm.gz \
+    && chmod +x /tmp/elm \
+    && mv /tmp/elm /usr/local/bin/elm
+RUN curl -fsSL https://github.com/avh4/elm-format/releases/download/0.8.7/elm-format-0.8.7-linux-x64.tgz \
+      | tar -xz -C /usr/local/bin elm-format
+RUN curl -fsSL -o /usr/local/bin/shfmt \
+      https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 \
+    && chmod +x /usr/local/bin/shfmt
+RUN curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
+      | tar -xJ -C /usr/local/bin --strip-components=1 shellcheck-v0.10.0/shellcheck
+
+WORKDIR /work
+CMD ["make", "check"]
