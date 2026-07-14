@@ -25,10 +25,10 @@ defmodule Claudeview.Watcher do
   defp scan(state) do
     current =
       for path <- Path.wildcard(Path.join(state.dir, "*.md")), into: %{} do
-        {path, mtime(path)}
+        {path, stat(path)}
       end
 
-    for {path, mtime} <- current, Map.get(state.seen, path) != mtime do
+    for {path, {mtime, _size} = stamp} <- current, Map.get(state.seen, path) != stamp do
       Claudeview.Store.put(tab_name(path), Claudeview.Render.to_html(path), mtime)
     end
 
@@ -40,10 +40,13 @@ defmodule Claudeview.Watcher do
     %{state | seen: current}
   end
 
-  defp mtime(path) do
+  # `{mtime, size}` rather than bare mtime: POSIX mtime is seconds-resolution, so
+  # a rewrite in the same second shares its mtime; the size closes that gap and
+  # keeps a same-second edit from being skipped as unchanged.
+  defp stat(path) do
     case File.stat(path, time: :posix) do
-      {:ok, %File.Stat{mtime: mtime}} -> mtime
-      {:error, _} -> nil
+      {:ok, %File.Stat{mtime: mtime, size: size}} -> {mtime, size}
+      {:error, _} -> {nil, nil}
     end
   end
 
