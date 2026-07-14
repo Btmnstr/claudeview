@@ -10,6 +10,10 @@ services:
       # Shared with the hook's default. Resolved once at `up` time; persists
       # across reboots (unlike /tmp), so it stays owned by you, not root.
       - "${HOME}/.claudeview:/content"
+      # Live-serve the stylesheet from the host so CSS edits show on a browser
+      # refresh — no image rebuild. A single-file mount, not the whole web/ dir,
+      # which would shadow the image's compiled elm.js.
+      - "./web/theme.css:/app/priv/web/theme.css:ro"
     environment:
       WATCH_DIR: /content
       # Host-facing path shown in the viewer's header (the container only ever
