@@ -267,6 +267,20 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
   untrusted input, enable `cmark-gfm`'s `tagfilter` extension in
   `server/lib/claudeview/render.ex`.
 
+## Future improvements
+
+- **Group tabs by an explicit project field, not the first `-` segment.** The
+  viewer folds tabs into one split-button per project by taking the first
+  `-`-delimited token of the tab name, so a repo whose name contains a hyphen
+  (`my-cool-repo`) is split across a `my` group. Emitting the project as its own
+  field — from the push hook, carried through `/content` — would group reliably
+  regardless of hyphens.
+- **Keep a manually opened document pinned across content changes.** Selecting
+  an older document (a `plan`, say) gives way to the project's newest-modified
+  tab on the next watched-file change, because every SSE ping re-adopts the
+  server's focus. A sticky "the user picked this" flag that survives refetches
+  would let you keep reading an older tab without it being pulled away.
+
 ## Deliberately out of scope
 
 - MCP server (excluded by design; the file convention replaces it).
