@@ -14,6 +14,7 @@ is the group key.
 
 A slim header shows what the server is watching, the document on screen, and
 whether the live connection is up, so an empty screen still tells you where to look.
+
 -}
 
 import Browser
@@ -163,7 +164,9 @@ tabDecoder =
 
 
 type alias Group =
-    { key : String, tabs : List Tab } -- tabs newest-first
+    { key : String
+    , tabs : List Tab -- newest-first
+    }
 
 
 {-| The project a tab belongs to: everything before the first hyphen.

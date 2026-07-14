@@ -38,9 +38,9 @@ project_name() {
   if common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
     base="$(basename "$common")"
     case "$base" in
-      .git|.bare) basename "$(dirname "$common")" ;;
-      *.git)      basename "$base" .git ;;
-      *)          printf '%s\n' "$base" ;;
+      .git | .bare) basename "$(dirname "$common")" ;;
+      *.git) basename "$base" .git ;;
+      *) printf '%s\n' "$base" ;;
     esac
   else
     basename "${dir:-claude}"
@@ -112,7 +112,7 @@ log_file="${CLAUDEVIEW_LOG:-$HOME/.claudeview/.push.log}"
 log() {
   mkdir -p "$(dirname "$log_file")" 2>/dev/null || true
   printf '%s  mode=%-12s tab=%-12s chars=%-5s %s\n' \
-    "$(date +%FT%T%z)" "$mode" "$tab" "${#md}" "$1" >> "$log_file" 2>/dev/null || true
+    "$(date +%FT%T%z)" "$mode" "$tab" "${#md}" "$1" >>"$log_file" 2>/dev/null || true
 }
 
 # Only mirror long-format text — skip trivial tails like "Done." Tune the floor
@@ -132,9 +132,9 @@ else
 fi
 
 if [ -n "${CLAUDEVIEW_URL:-}" ]; then
-  if printf '%s' "$md" \
-       | curl -sS -m 2 -X POST "${CLAUDEVIEW_URL%/}/push?tab=${tab}" --data-binary @- \
-         >/dev/null 2>&1; then
+  if printf '%s' "$md" |
+    curl -sS -m 2 -X POST "${CLAUDEVIEW_URL%/}/push?tab=${tab}" --data-binary @- \
+      >/dev/null 2>&1; then
     log "posted -> ${CLAUDEVIEW_URL%/}/push?tab=${tab}"
   else
     log "post-failed -> ${CLAUDEVIEW_URL%/}"
@@ -142,7 +142,7 @@ if [ -n "${CLAUDEVIEW_URL:-}" ]; then
 else
   dir="${CLAUDEVIEW_DIR:-$HOME/.claudeview}"
   mkdir -p "$dir"
-  printf '%s' "$md" > "${dir}/${tab}.md"
+  printf '%s' "$md" >"${dir}/${tab}.md"
   log "written -> ${dir}/${tab}.md"
 fi
 
