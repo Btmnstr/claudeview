@@ -367,6 +367,29 @@ html, body {
   color: var(--muted);
 }
 
+.content img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* A rendered diagram (```mermaid / ```dot / ```svg → inline SVG). Kept on a light
+   card in both themes so black-on-transparent output from Graphviz/Mermaid always
+   reads; per-renderer dark theming can come later. Wide diagrams scroll. */
+.content .cv-diagram {
+  margin: 1.5rem auto;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.content .cv-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Seam between two rapid writes the server joined into one tab — a soft dashed
    rule, distinct from a hard in-document `---`. */
 .content hr.cv-join {
