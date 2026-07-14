@@ -5,13 +5,24 @@ defmodule Claudeview.Store do
   A tab is `%{html: String.t(), mtime: integer()}` keyed by name. Any change
   broadcasts `:changed` to every subscribed process, which is all the viewer
   needs to know it should re-fetch `/content`.
+
+  When a *session-shaped* tab (name ending in `-<hex>`, e.g. `ClaudeView-7f18`)
+  is rewritten within `join_window_s` of its previous write, the new HTML is
+  appended below the old instead of replacing it. Rapid successive writes to the
+  same session tab — an implementation summary then a final summary moments
+  later — would otherwise clobber each other, since the second overwrites the
+  first on disk before it can be read.
   """
 
   use GenServer
 
+  # Separator between two joined writes. Two cmark-gfm fragments stacked with an
+  # <hr> between form valid HTML; each was already highlighted, so no re-render.
+  @join "\n<hr class=\"cv-join\">\n"
+
   # Public API
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   def put(tab, html, mtime), do: GenServer.cast(__MODULE__, {:put, tab, html, mtime})
 
@@ -25,11 +36,22 @@ defmodule Claudeview.Store do
   # Server
 
   @impl true
-  def init(_), do: {:ok, %{tabs: %{}, subs: MapSet.new()}}
+  def init(opts) do
+    state = %{
+      tabs: %{},
+      subs: MapSet.new(),
+      join_window_s: Keyword.get(opts, :join_window_s, 120),
+      join_pattern: Keyword.get(opts, :join_pattern, ~r/-[0-9a-f]{4,}$/i)
+    }
+
+    {:ok, state}
+  end
 
   @impl true
   def handle_cast({:put, tab, html, mtime}, state) do
     broadcast(state.subs)
+    existing = state.tabs[tab]
+    html = if join?(existing, mtime, tab, state), do: existing.html <> @join <> html, else: html
     {:noreply, put_in(state.tabs[tab], %{html: html, mtime: mtime})}
   end
 
@@ -49,6 +71,17 @@ defmodule Claudeview.Store do
   @impl true
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     {:noreply, update_in(state.subs, &MapSet.delete(&1, pid))}
+  end
+
+  # Join only a fresh write (strictly newer mtime) to a session-shaped tab that
+  # was last written within the window. The strict `>` keeps a Watcher restart —
+  # which re-observes every file at its unchanged mtime — from duplicating content.
+  defp join?(nil, _mtime, _tab, _state), do: false
+
+  defp join?(existing, mtime, tab, state) do
+    mtime > existing.mtime and
+      mtime - existing.mtime <= state.join_window_s and
+      Regex.match?(state.join_pattern, tab)
   end
 
   defp broadcast(subs), do: Enum.each(subs, &send(&1, :changed))
