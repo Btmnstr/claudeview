@@ -167,6 +167,29 @@ every file under the directory. If you point the viewer elsewhere with
 `CLAUDEVIEW_DIR`, match that path instead — a leading `//` denotes an absolute
 path, e.g. `Write(//mnt/nfs/claudeview/**)`.
 
+## Diagrams and images
+
+A tab is Markdown, so beyond prose, tables and highlighted code it can carry
+**diagrams** and **images** — both rendered server-side, self-contained, no
+browser-side JavaScript.
+
+- **Diagrams** render to inline SVG. Three fenced-block languages are recognised:
+
+  - ` ```mermaid ` — rendered by [`mmdr`](https://github.com/1jehuang/mermaid-rs-renderer),
+    a native Rust renderer (no headless browser);
+  - ` ```dot ` (or ` ```graphviz `) — rendered by Graphviz `dot`;
+  - ` ```svg ` — SVG you authored, passed straight through.
+
+  A block that fails to render — an unknown binary, a syntax error — is left as
+  its **verbatim source text**, never a broken image. So the feature is safe to
+  lean on: worst case you see the diagram's source.
+
+- **Images** are files you drop into `WATCH_DIR` beside the `.md`, referenced with
+  ordinary Markdown: `![alt](shot.png)`. The server serves them from `/media`
+  (relative links are rewritten there automatically). Absolute `http(s)://` and
+  `data:` URIs are left untouched — note a remote URL is fetched fresh on every
+  render, so a local file is the private, offline-friendly choice.
+
 ## Start the viewer automatically on login
 
 `docker compose up -d` plus the `restart: unless-stopped` policy already brings
@@ -236,19 +259,20 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
 | `GET` | `/assets/<name>` | Static assets (`elm.js`, `theme.css`, webfonts). |
 | `GET` | `/events` | SSE stream; emits `data: changed` on any content change (and once on connect). |
 | `GET` | `/content` | JSON snapshot: `{tabs: [{name, html, mtime}], focus, watching: [dir, …]}`. |
+| `GET` | `/media/<name>` | An image file from `WATCH_DIR`, for Markdown `![alt](name.png)`. |
 | `POST` | `/push?tab=<name>` | Write the request body to `<name>.md` in `WATCH_DIR`. |
 
 ## Project layout
 
 | Path | What it is |
 |---|---|
-| `server/` | Elixir app (Bandit + Plug + Jason). Watches `WATCH_DIR`, renders via `cmark-gfm` (GFM tables, task lists, …) and highlights fenced code via `chroma`, serves SSE + the viewer. |
+| `server/` | Elixir app (Bandit + Plug + Jason). Watches `WATCH_DIR`, renders via `cmark-gfm` (GFM tables, task lists, …), highlights fenced code via `chroma`, renders `mermaid`/`dot`/`svg` blocks to inline SVG (`mmdr`/`graphviz`), serves SSE + the viewer. |
 | `web/` | Elm viewer (`Main.elm`) + `index.html` bootstrap + `theme.css` (light/dark palettes, syntax colours) + the bundled JetBrains Mono webfont (`*.woff2`, SIL OFL). |
 | `hooks/claudeview-push` | Bash + jq + curl. Mirrors plans / final answers to the viewer. |
 | `hooks/settings.snippet.json` | Hook wiring to merge into `~/.claude/settings.json`. |
 | `bin/claudeview-open` | Opens the viewer as a dedicated, full-screen browser window. |
 | `content/welcome.md` | Seed tab; copy it into `~/.claudeview` on first run. The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
-| `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma), plus the `tools` stage that runs the checks below. |
+| `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma + graphviz + mmdr), plus the `tools` stage that runs the checks below. |
 | `Makefile` / `githooks/` | The code-quality tool chain and its opt-in git hooks (see Development). |
 
 ## Development
