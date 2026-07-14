@@ -3,8 +3,8 @@ defmodule Claudeview.Router do
 
   use Plug.Router
 
-  plug :match
-  plug :dispatch
+  plug(:match)
+  plug(:dispatch)
 
   get "/" do
     serve(conn, "index.html")

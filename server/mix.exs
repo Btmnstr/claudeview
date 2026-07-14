@@ -22,7 +22,8 @@ defmodule Claudeview.MixProject do
     [
       {:bandit, "~> 1.5"},
       {:plug, "~> 1.16"},
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end
