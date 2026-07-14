@@ -373,7 +373,7 @@ html, body {
   border: 0;
   border-top: 1px dashed var(--muted);
   opacity: 0.5;
-  margin: 3rem 0;
+  margin: 3rem auto;   /* auto keeps it centred on the measure like .content > * */
 }
 
 /* Syntax highlighting. chroma wraps tokens in <span class="k|s|c…"> inside
