@@ -35,7 +35,9 @@ Three ideas keep it small:
   pipeline, one content store.
 - **Each `.md` file in `WATCH_DIR` is a tab**, newest-modified auto-focused. That
   is the whole "Claude controls the viewer" mechanism — Claude just uses the
-  `Write` tool it already has. No plugin, no protocol.
+  `Write` tool it already has. No plugin, no protocol. When a session tab is
+  rewritten within `JOIN_WINDOW_S`, its new content is appended below the old
+  rather than replacing it, so two quick writes in one turn both survive.
 - **The watcher polls file mtimes** rather than using inotify: polling is simpler
   *and* correct over NFS (where inotify is unreliable), so the same code path
   serves a local directory and a home-lab NFS mount.
@@ -203,6 +205,8 @@ The prototype runs locally, but nothing is local-only:
 | `WATCH_DIR` | `content` | Directory the watcher polls; `POST /push` writes here. Compose sets it to `/content` (the mount of `~/.claudeview`). |
 | `CLAUDEVIEW_LABEL` | value of `WATCH_DIR` | Host-facing path shown in the viewer's header (the container only sees `/content`). |
 | `POLL_MS` | `1000` | Poll interval in milliseconds. |
+| `JOIN_WINDOW_S` | `120` | A session tab rewritten within this many seconds of its previous write is *joined* (new content appended below a rule) rather than replaced, so two quick writes don't clobber each other. |
+| `JOIN_PATTERN` | `-[0-9a-f]{4,}$` | Which tab names join: by default session-shaped names ending in `-<hex>` (e.g. `-7f18`). Plans and prose tabs don't match, so they always replace. |
 | `WEB_DIR` | `priv/web` | Where `index.html` / `elm.js` / `theme.css` / webfonts are served from. |
 
 Hook environment variables (set on the machine running Claude Code):
