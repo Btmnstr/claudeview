@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# pre-commit — the fast half of the quality gate: formatting and shell lint.
+# Kept quick so frequent commits stay snappy; the full gate (compile, Elm type
+# check, Credo) runs on push instead. See the root Makefile.
+#
+# Enable with:  make install-hooks
+# Skip once:    git commit --no-verify
+
+set -euo pipefail
+
+exec make check-fast

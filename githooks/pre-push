@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# pre-push — the full quality gate before code leaves the machine: everything
+# the pre-commit hook checks, plus Elixir compilation (warnings as errors),
+# Credo, and the Elm compiler's type check. See the root Makefile.
+#
+# Enable with:  make install-hooks
+# Skip once:    git push --no-verify
+
+set -euo pipefail
+
+exec make check
