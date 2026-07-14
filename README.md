@@ -244,7 +244,34 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
 | `hooks/settings.snippet.json` | Hook wiring to merge into `~/.claude/settings.json`. |
 | `bin/claudeview-open` | Opens the viewer as a dedicated, full-screen browser window. |
 | `content/welcome.md` | Seed tab; copy it into `~/.claudeview` on first run. The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
-| `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma). |
+| `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma), plus the `tools` stage that runs the checks below. |
+| `Makefile` / `githooks/` | The code-quality tool chain and its opt-in git hooks (see Development). |
+
+## Development
+
+Formatting, linting and type checking all run **inside a pinned Docker image**
+(the `tools` stage), so the host needs only Docker and `make` — no local Elixir,
+Elm or shellcheck, and no version drift between machines.
+
+```sh
+make tools          # once: build the image, warm the hex/rebar/deps caches
+make install-hooks  # once, optional: run the checks on commit and push
+make format         # apply every formatter in place
+make check          # the full gate — format, compile, type-check, lint
+```
+
+What the gate covers, each with its language's canonical tool:
+
+| Language | Format | Static check |
+|---|---|---|
+| Elixir | `mix format` | `mix compile --warnings-as-errors`, `mix credo --strict` |
+| Elm | `elm-format` | `elm make` (the compiler is the type checker) |
+| Bash | `shfmt` | `shellcheck` |
+
+The git hooks are opt-in via `core.hooksPath` (set by `make install-hooks`,
+undone by `git config --unset core.hooksPath`). `pre-commit` runs the fast half
+(`make check-fast`: formatting + shell lint); `pre-push` runs the full
+`make check`. Bypass either once with `--no-verify`.
 
 ## Notes and limitations
 
