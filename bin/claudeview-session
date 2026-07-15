@@ -12,8 +12,22 @@
 
 set -euo pipefail
 
-self="$(readlink -f "${BASH_SOURCE[0]}")"
+# Resolve a possibly-symlinked path to the directory that holds its target.
+# Portable (GNU + BSD/macOS): follows symlink chains with plain `readlink`, since
+# `readlink -f` is GNU-only. Twinned in hooks/claudeview-push, which must locate
+# the same lib before it can source it — so the resolver can't live in the lib.
+resolve_dir() {
+  local src="$1" dir
+  while [ -L "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+
+# resolve_dir lands in bin/; the lib is one level up under hooks/.
 # shellcheck source=hooks/claudeview-lib.sh
-source "$(dirname "$(dirname "$self")")/hooks/claudeview-lib.sh"
+source "$(dirname "$(resolve_dir "${BASH_SOURCE[0]}")")/hooks/claudeview-lib.sh"
 
 cv_session_key "$PWD"

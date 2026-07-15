@@ -25,12 +25,25 @@ set -euo pipefail
 mode="${1:-last-message}"
 payload="$(cat)"
 
+# Resolve a possibly-symlinked path to the directory that holds its target.
+# Portable (GNU + BSD/macOS): follows symlink chains with plain `readlink`, since
+# `readlink -f` is GNU-only. Twinned in bin/claudeview-session, which must locate
+# the same lib before it can source it — so the resolver can't live in the lib.
+resolve_dir() {
+  local src="$1" dir
+  while [ -L "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+
 # The session key groups this session's documents in the viewer: <repo>~<branch>
 # in a git repo, else <topic>~<sid>. The identity helpers live in a shared lib so
-# the hook and bin/claudeview-session can never derive different keys. readlink -f
-# resolves the real path whether the hook runs directly or via a symlink.
+# the hook and bin/claudeview-session can never derive different keys.
 # shellcheck source=hooks/claudeview-lib.sh
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/claudeview-lib.sh"
+source "$(resolve_dir "${BASH_SOURCE[0]}")/claudeview-lib.sh"
 
 cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty')"
 
