@@ -46,10 +46,33 @@ Three ideas keep it small:
 
 - **Docker** with the Compose plugin (server dependencies are all contained in
   the image — Elixir, Elm, `cmark-gfm` and `chroma`).
-- **`jq`** and **`curl`** on the machine running Claude Code — the only host
-  dependencies, used by the hook script.
-- A **Chromium-family browser** (`google-chrome`, `chromium`, …) for the viewer
-  window; any browser can open the URL, but the launch script wants `--app`.
+- **`git`, `jq` and `curl`** on the machine running Claude Code — the host
+  dependencies used by the hook and the `claudeview-session` helper. `git` needs
+  **≥ 2.31** (for `--path-format`); an older git isn't fatal — the session key
+  just falls back to the directory name. On macOS `git` and `curl` ship with the
+  OS, but `jq` does not (`brew install jq`).
+- A **Chromium-family browser** (`google-chrome`, `chromium`, … on Linux; the
+  `Google Chrome.app` / `Chromium.app` / `Brave`/`Edge` bundles on macOS) for the
+  viewer window; any browser can open the URL, but the launch script wants `--app`.
+
+### Windows (WSL2)
+
+The hooks are bash + `jq` + `curl`, so on Windows **run Claude Code itself inside
+WSL2** — then ClaudeView behaves exactly as on Linux, and everything below applies
+unchanged:
+
+- Check out ClaudeView inside the WSL2 distro and run Claude Code from there, so
+  the hooks execute in a shell that has `jq`/`curl` and a valid `$HOME`.
+- Docker Desktop with the WSL2 backend (or Docker installed inside the distro)
+  runs the server; the published port is reachable at `http://localhost:4790`
+  from the Windows host.
+- Open the viewer in a **Windows-side** Chrome — `bin/claudeview-open` looks for a
+  Linux browser and won't help inside WSL, so use an ordinary window or a Windows
+  shortcut to the URL. Rotate to portrait in Windows Display settings.
+
+Native Windows (no WSL) is not supported: `docker-compose.yml` interpolates
+`${HOME}` for its bind mounts, which is unset outside WSL (Windows uses
+`USERPROFILE`). Inside WSL `$HOME` is set, so the compose file works as written.
 
 ## Quick start
 
@@ -91,6 +114,9 @@ Rotate the target monitor to portrait at the OS level (not in the browser):
 xrandr --output DP-0 --rotate left        # X11 (use your output's name)
 wlr-randr --output DP-0 --transform 90    # Wayland (wlroots)
 ```
+
+On macOS rotate under **System Settings › Displays**, on Windows under **Display
+settings › Display orientation** — there is no command-line equivalent to script.
 
 `bin/claudeview-open` places the window at `0,0` by default; set
 `CLAUDEVIEW_POS="x,y"` to target a monitor that sits elsewhere in your layout.
@@ -228,8 +254,10 @@ browser-side JavaScript.
 
 `docker compose up -d` plus the `restart: unless-stopped` policy already brings
 the **server** back after a reboot (as long as Docker starts on boot). To bring
-the **browser window** up automatically too, add an XDG autostart entry that runs
-the launch script — create `~/.config/autostart/claudeview.desktop`:
+the **browser window** up automatically too, register the launch script with your
+OS's login mechanism.
+
+**Linux** — add an XDG autostart entry, `~/.config/autostart/claudeview.desktop`:
 
 ```ini
 [Desktop Entry]
@@ -241,6 +269,23 @@ X-GNOME-Autostart-enabled=true
 
 (Adjust the path to your checkout. Most desktop environments read this location;
 some use their own autostart mechanism instead.)
+
+**macOS** — add a `launchd` LaunchAgent, `~/Library/LaunchAgents/com.claudeview.open.plist`,
+then `launchctl load` it (or just log out and back in):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.claudeview.open</string>
+  <key>ProgramArguments</key>
+  <array><string>/path/to/ClaudeView/bin/claudeview-open</string></array>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
+```
 
 ## Roadmap: run the server on the home lab
 
