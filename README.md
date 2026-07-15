@@ -131,19 +131,30 @@ start, so open a **new** Claude Code session for them to take effect.
 
 ## Let Claude open a tab on purpose
 
-Add a line like this to your project `CLAUDE.md`:
+Add a line like this to your project `CLAUDE.md` (or global `~/.claude/CLAUDE.md`):
 
 > To display something on the ClaudeView viewer, write it to
-> `~/.claudeview/<tab>.md` (kebab-case) — each file is a tab. Lead the name with
-> the project you are working in, so a viewer shared by several sessions shows
-> which one wrote each tab, e.g. `myproject-plan.md`, `myproject-review.md`.
-> Reuse a stable name so an update replaces the tab instead of spawning a new one.
+> `~/.claudeview/$(claudeview-session)~<doc>.md`. `claudeview-session` prints this
+> session's `<repo>~<branch>` key, so the document groups with the session's plan
+> and summary under one `repo@branch` tab. `<doc>` names the kind of document —
+> `review`, `research`, `notes`. Reuse a stable `<doc>` so an update replaces that
+> tab instead of spawning a new one.
 
 Claude then curates the viewer with the ordinary `Write` tool — no MCP. This is
 the **most reliable** path: unlike the `Stop` hook it does not depend on session
 lifecycle or transcript timing, so it behaves the same in foreground, background
-and away sessions. It mirrors the hook's own naming (see
-[Notes](#notes-and-limitations)): both lead the tab with the project.
+and away sessions.
+
+`claudeview-session` (in `bin/`) shares one identity library with the hook
+(`hooks/claudeview-lib.sh`), so a manual write and the hook's own `plan`/`summary`
+tabs can never drift into different groups. Symlink it onto your `PATH` once:
+
+```sh
+ln -s "$PWD/bin/claudeview-session" ~/.local/bin/
+```
+
+Outside a git repo it prints just the directory name (there is no branch); supply
+your own `<intention>~<doc>` name in that case.
 
 ### Approve the writes once, for every session
 
@@ -183,8 +194,11 @@ to `~/.claude/CLAUDE.md`:
 > shows the findings first and the final plan after.
 
 Because each session's plan file has a random name, the directory is collapsed to
-one stable tab; and `plan` doesn't match `JOIN_PATTERN`, so the final plan cleanly
-*replaces* the findings rather than appending below them.
+one stable tab, shown as **`plan (live)`** — the plan being worked on right now, in
+any session, not a project of its own. On ExitPlanMode the `plan` hook files an
+attributed `repo~branch~plan` into that session's own group, so the finished plan
+sits beside the session's summary; for a moment both show the same content. `plan`
+doesn't match `JOIN_PATTERN`, so a rewrite cleanly *replaces* rather than appends.
 
 ## Diagrams and images
 
@@ -249,8 +263,8 @@ The prototype runs locally, but nothing is local-only:
 | `WATCH_DIR` | `content` | Directories the watcher polls, colon-separated. Each entry is `DIR` (one tab per file) or `DIR=TAB` (the directory collapsed to a single `TAB` tracking its newest file). `POST /push` writes to the first directory. Compose sets it to `/content:/plans=plan` — `~/.claudeview` plus a collapsed `plan` tab from `~/.claude/plans`. |
 | `CLAUDEVIEW_LABEL` | value of `WATCH_DIR` | Host-facing path shown in the viewer's header (the container only sees `/content`). |
 | `POLL_MS` | `1000` | Poll interval in milliseconds. |
-| `JOIN_WINDOW_S` | `120` | A session tab rewritten within this many seconds of its previous write is *joined* (new content appended below a rule) rather than replaced, so two quick writes don't clobber each other. |
-| `JOIN_PATTERN` | `-[0-9a-f]{4,}$` | Which tab names join: by default session-shaped names ending in `-<hex>` (e.g. `-7f18`). Plans and prose tabs don't match, so they always replace. |
+| `JOIN_WINDOW_S` | `120` | A joinable tab rewritten within this many seconds of its previous write is *joined* (new content appended below a rule) rather than replaced, so two quick writes don't clobber each other. |
+| `JOIN_PATTERN` | `~summary$` | Which tab names join: by default the auto-generated `~summary` tab, whose Stop-hook settle race can write twice. Plan, review and manual docs don't match, so they replace. |
 | `WEB_DIR` | `priv/web` | Where `index.html` / `elm.js` / `theme.css` / webfonts are served from. |
 
 Hook environment variables (set on the machine running Claude Code):
@@ -260,7 +274,7 @@ Hook environment variables (set on the machine running Claude Code):
 | `CLAUDEVIEW_DIR` | `~/.claudeview` | Directory the hook writes `<tab>.md` into (file-delivery mode). |
 | `CLAUDEVIEW_URL` | *(unset)* | If set, the hook `POST`s to `<url>/push` instead of writing a file (remote / home-lab). |
 | `CLAUDEVIEW_MIN_CHARS` | `200` | Floor for `last-message`; shorter final blocks are skipped. |
-| `CLAUDEVIEW_SID_CHARS` | `4` | Length of the session-id tail appended to the tab name so same-project sessions stay apart; `0` disables it. |
+| `CLAUDEVIEW_SID_CHARS` | `4` | Length of the session-id used as the branch stand-in for **non-git** sessions (`<topic>~<sid>`), so same-directory sessions stay apart; `0` drops it. Git sessions key on the branch and ignore it. |
 | `CLAUDEVIEW_SETTLE` | `0.5` | Seconds `last-message` waits before reading the transcript, to let the turn's final block flush. `0` disables. |
 | `CLAUDEVIEW_LOG` | `~/.claudeview/.push.log` | Breadcrumb log each invocation's outcome is appended to. |
 
@@ -290,8 +304,10 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
 | `server/` | Elixir app (Bandit + Plug + Jason). Watches `WATCH_DIR`, renders via `cmark-gfm` (GFM tables, task lists, …), highlights fenced code via `chroma`, renders `mermaid`/`dot`/`svg` blocks to inline SVG (`mmdr`/`graphviz`), serves SSE + the viewer. |
 | `web/` | Elm viewer (`Main.elm`) + `index.html` bootstrap + `theme.css` (light/dark palettes, syntax colours) + the bundled JetBrains Mono webfont (`*.woff2`, SIL OFL). |
 | `hooks/claudeview-push` | Bash + jq + curl. Mirrors plans / final answers to the viewer. |
+| `hooks/claudeview-lib.sh` | Shared identity helpers (`repo~branch` session key), sourced by the hook and `claudeview-session`. |
 | `hooks/settings.snippet.json` | Hook wiring to merge into `~/.claude/settings.json`. |
 | `bin/claudeview-open` | Opens the viewer as a dedicated, full-screen browser window. |
+| `bin/claudeview-session` | Prints this directory's session key, so a manual `Write` groups with the hook's tabs. |
 | `content/welcome.md` | Seed tab; copy it into `~/.claudeview` on first run. The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
 | `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma + graphviz + mmdr), plus the `tools` stage that runs the checks below. |
 | `Makefile` / `githooks/` | The code-quality tool chain and its opt-in git hooks (see Development). |
@@ -324,13 +340,15 @@ undone by `git config --unset core.hooksPath`). `pre-commit` runs the fast half
 
 ## Notes and limitations
 
-- **Tabs are named per project and session.** The hook names each tab after the
-  session's project — the git repo directory (so a bare-repo + worktree layout
-  reports the repo, not the branch-named worktree), or `basename(cwd)` outside a
-  repo — plus a short session-id tail so two sessions in the *same* project do
-  not share a tab (`myproject-a3f9`, `myproject-a3f9-plan`). Set
-  `CLAUDEVIEW_SID_CHARS=0` to drop the tail. Manual `Write`s follow the same
-  convention by leading the filename with the project.
+- **Tabs are grouped by session: `<repo>~<branch>`.** The hook names each tab
+  `<session>~<doc>`, where the session is `<repo>~<branch>` (the git repo — so a
+  bare-repo + worktree layout reports the repo, not the branch-named worktree —
+  and the checked-out branch), or `<topic>~<sid>` outside a repo. The viewer
+  groups on the session and shows it as `repo@branch`, so a session's `plan`,
+  `summary` and manual docs sit under one tab and different branches stay apart.
+  The `~` delimiter is reserved: git forbids it in branch names, and each
+  component is sanitized, so a repo or branch containing hyphens never mis-splits.
+  Manual `Write`s reuse the exact key via `bin/claudeview-session`.
 - **`last-message` skips short turns** by design: a turn whose last text block is
   under `CLAUDEVIEW_MIN_CHARS` (or which emits no prose at all) produces no tab,
   so trivial acknowledgements never clobber the last long answer you were reading.
@@ -345,12 +363,6 @@ undone by `git config --unset core.hooksPath`). `pre-commit` runs the fast half
 
 ## Future improvements
 
-- **Group tabs by an explicit project field, not the first `-` segment.** The
-  viewer folds tabs into one split-button per project by taking the first
-  `-`-delimited token of the tab name, so a repo whose name contains a hyphen
-  (`my-cool-repo`) is split across a `my` group. Emitting the project as its own
-  field — from the push hook, carried through `/content` — would group reliably
-  regardless of hyphens.
 - **Keep a manually opened document pinned across content changes.** Selecting
   an older document (a `plan`, say) gives way to the project's newest-modified
   tab on the next watched-file change, because every SSE ping re-adopts the

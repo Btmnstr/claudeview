@@ -26,7 +26,7 @@ file write → Watcher (poll) → Render (cmark-gfm + chroma) → Store (HTML pe
 | `application.ex` | Supervises Store, Watcher, Bandit. All config is env vars, read here. |
 | `watcher.ex` | Polls `WATCH_DIR/*.md` by `{mtime, size}`; renders changed files into the Store. Polling (not inotify) is deliberate — it works over NFS. |
 | `render.ex` | Markdown → HTML via the `cmark-gfm` CLI, then transforms each fenced block: `mermaid`/`dot`/`svg` → inline SVG (via `mmdr`/`dot`), other known languages → `chroma` highlighting, else verbatim. Relative `<img>` links are routed through `/media`. Every transform is best-effort — a failure falls back to the verbatim block. |
-| `store.ex` | GenServer: rendered HTML `%{html, mtime}` per tab + SSE subscribers. A rapid rewrite of a session tab (`-<hex>$`) within `JOIN_WINDOW_S` is joined below the old, not replaced. |
+| `store.ex` | GenServer: rendered HTML `%{html, mtime}` per tab + SSE subscribers. A rapid rewrite of a joinable tab (`~summary$`) within `JOIN_WINDOW_S` is joined below the old, not replaced. |
 | `router.ex` | HTTP: viewer + assets, `GET /content` (JSON snapshot, sets focus = newest), `GET /events` (SSE), `GET /media/<name>` (author images), `POST /push?tab=`. |
 
 **Client** — Elm, single file `web/src/Main.elm` (`Browser.element`). It never
