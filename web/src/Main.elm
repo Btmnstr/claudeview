@@ -10,7 +10,8 @@ Clicking a tab pins it until the next content change.
 Tabs are named `<session>~<doc>` (session is `<repo>~<branch>`), so the viewer
 folds them into one split-button per session: the button jumps to that session's
 newest document, and a dropdown reaches the older ones. The part before the last
-`~` is the group key, matched case-insensitively.
+`~` is the group key, matched case-insensitively; a name with no `~` falls back to
+the older rule (the segment before the first `-`) so pre-`~` tabs still group.
 
 A slim header shows what the server is watching, the document on screen, and
 whether the live connection is up, so an empty screen still tells you where to look.
@@ -170,21 +171,26 @@ type alias Group =
     }
 
 
-{-| The session a tab belongs to: everything before the _last_ `~`. A name with
-no `~` (`plan`, `welcome`) is its own session.
+{-| The session a tab belongs to. New-grammar names (`repo~branch~doc`) split on
+the _last_ `~`. Names with no `~` fall back to the old rule — the segment before
+the first `-` — so tabs written before the `~` grammar still group by project.
 -}
 sessionPart : String -> String
 sessionPart name =
-    case List.reverse (String.split "~" name) of
-        _ :: session ->
-            if List.isEmpty session then
+    if String.contains "~" name then
+        case List.reverse (String.split "~" name) of
+            _ :: session ->
+                if List.isEmpty session then
+                    name
+
+                else
+                    session |> List.reverse |> String.join "~"
+
+            [] ->
                 name
 
-            else
-                session |> List.reverse |> String.join "~"
-
-        [] ->
-            name
+    else
+        name |> String.split "-" |> List.head |> Maybe.withDefault name
 
 
 {-| The grouping identity: the session part, lowercased so one project written in
@@ -195,21 +201,26 @@ groupKey name =
     String.toLower (sessionPart name)
 
 
-{-| The human label for a group: `repo@branch` from a `repo~branch` session, else
-the session verbatim. `@` is display-only — on disk the delimiter is `~`.
+{-| The human label for a group: `repo@branch` for a `repo~branch` session, else
+the session verbatim (a legacy name or a bare singleton like `plan`). `@` is
+display-only — on disk the delimiter is `~`.
 -}
 groupLabel : String -> String
 groupLabel name =
-    case String.split "~" (sessionPart name) of
-        repo :: branch ->
-            if List.isEmpty branch then
-                repo
+    if String.contains "~" name then
+        case String.split "~" (sessionPart name) of
+            repo :: branch ->
+                if List.isEmpty branch then
+                    repo
 
-            else
-                repo ++ "@" ++ String.join "~" branch
+                else
+                    repo ++ "@" ++ String.join "~" branch
 
-        [] ->
-            name
+            [] ->
+                name
+
+    else
+        sessionPart name
 
 
 {-| Fold the flat tab list into alphabetical groups (a `Dict` orders its keys),
@@ -238,20 +249,35 @@ toGroups tabs =
 
 
 {-| The label for a dropdown entry: the document type after the session prefix
-(`plan`, `summary`, `review`), or the whole name when there is no suffix.
+(`plan`, `summary`, `review`). New grammar takes the segment after the last `~`;
+a legacy name takes the part after the first `-`; either falls back to the whole
+name when there is no suffix.
 -}
 docLabel : String -> String
 docLabel name =
-    case List.reverse (String.split "~" name) of
-        doc :: rest ->
-            if List.isEmpty rest then
+    if String.contains "~" name then
+        case List.reverse (String.split "~" name) of
+            doc :: rest ->
+                if List.isEmpty rest then
+                    name
+
+                else
+                    doc
+
+            [] ->
                 name
 
-            else
-                doc
+    else
+        case String.split "-" name of
+            _ :: rest ->
+                if List.isEmpty rest then
+                    name
 
-        [] ->
-            name
+                else
+                    String.join "-" rest
+
+            [] ->
+                name
 
 
 relative : Int -> Int -> String
