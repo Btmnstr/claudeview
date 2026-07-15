@@ -167,6 +167,25 @@ every file under the directory. If you point the viewer elsewhere with
 `CLAUDEVIEW_DIR`, match that path instead — a leading `//` denotes an absolute
 path, e.g. `Write(//mnt/nfs/claudeview/**)`.
 
+### Watch plan-mode findings live
+
+In plan mode the harness lets Claude write **only** the current plan file
+(`~/.claude/plans/<slug>.md`); a `Write` to `~/.claudeview/` is denied. But that
+plan file is built incrementally and naturally goes findings → final plan — so
+point the viewer at the plans directory, collapsed to a single `plan` tab that
+tracks the newest file (`docker-compose.yml` mounts `~/.claude/plans` and sets
+`WATCH_DIR=/content:/plans=plan`; see [Configuration](#configuration)). Then add
+to `~/.claude/CLAUDE.md`:
+
+> During plan mode the harness lets you write only the designated plan file. Treat
+> it as the live ClaudeView document: write your Phase-1 long-form findings into
+> the plan file immediately, then overwrite it with the final plan. The `plan` tab
+> shows the findings first and the final plan after.
+
+Because each session's plan file has a random name, the directory is collapsed to
+one stable tab; and `plan` doesn't match `JOIN_PATTERN`, so the final plan cleanly
+*replaces* the findings rather than appending below them.
+
 ## Diagrams and images
 
 A tab is Markdown, so beyond prose, tables and highlighted code it can carry
@@ -215,6 +234,8 @@ The prototype runs locally, but nothing is local-only:
 1. Deploy the same image to the home-lab Docker host.
 2. Point `WATCH_DIR` at an NFS-mounted content path
    (`WATCH_DIR=/mnt/nfs/claudeview`). mtime polling works over NFS by design.
+   `WATCH_DIR` is colon-separated, so a local directory and an NFS mount (or the
+   plan-mode `plan` tab) coexist — e.g. `WATCH_DIR=/mnt/nfs/claudeview:/content`.
 3. On the Claude Code host, set `CLAUDEVIEW_URL=http://homelab:4790` so hooks
    `POST` over the network — **or** write straight to the NFS mount with
    `CLAUDEVIEW_DIR`. Both feed the same watcher.
@@ -225,7 +246,7 @@ The prototype runs locally, but nothing is local-only:
 |---|---|---|
 | `PORT` | `4790` | HTTP port the server listens on (inside the container). |
 | `CLAUDEVIEW_HOST_PORT` | `4790` | Host port `docker compose` publishes the viewer on. |
-| `WATCH_DIR` | `content` | Directory the watcher polls; `POST /push` writes here. Compose sets it to `/content` (the mount of `~/.claudeview`). |
+| `WATCH_DIR` | `content` | Directories the watcher polls, colon-separated. Each entry is `DIR` (one tab per file) or `DIR=TAB` (the directory collapsed to a single `TAB` tracking its newest file). `POST /push` writes to the first directory. Compose sets it to `/content:/plans=plan` — `~/.claudeview` plus a collapsed `plan` tab from `~/.claude/plans`. |
 | `CLAUDEVIEW_LABEL` | value of `WATCH_DIR` | Host-facing path shown in the viewer's header (the container only sees `/content`). |
 | `POLL_MS` | `1000` | Poll interval in milliseconds. |
 | `JOIN_WINDOW_S` | `120` | A session tab rewritten within this many seconds of its previous write is *joined* (new content appended below a rule) rather than replaced, so two quick writes don't clobber each other. |
