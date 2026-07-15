@@ -166,17 +166,18 @@ Pre-approve it for **all** sessions by adding to `~/.claude/settings.json`
 {
   "permissions": {
     "allow": [
-      "Write(~/.claudeview/**)",
       "Edit(~/.claudeview/**)"
     ]
   }
 }
 ```
 
-`Write` and `Edit` are separate tools, so both rules are needed; `**` covers
-every file under the directory. If you point the viewer elsewhere with
-`CLAUDEVIEW_DIR`, match that path instead — a leading `//` denotes an absolute
-path, e.g. `Write(//mnt/nfs/claudeview/**)`.
+One `Edit` rule is enough: file-permission checks only honor `Edit(path)` rules,
+and an `Edit` rule covers **all** file-editing tools (Write, Edit, NotebookEdit).
+A separate `Write(...)` rule is inert — Claude warns that it is not matched — so
+don't add one. `**` covers every file under the directory. If you point the
+viewer elsewhere with `CLAUDEVIEW_DIR`, match that path instead — a leading `//`
+denotes an absolute path, e.g. `Edit(//mnt/nfs/claudeview/**)`.
 
 ### Watch plan-mode findings live
 
