@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# claudeview-session — print the ClaudeView session key for the current dir.
+#
+# It calls the same function the hook uses, so a manual write lands in the hook's
+# group instead of a group of its own:
+#
+#   ~/.claudeview/$(claudeview-session)~review.md   ->   <repo>~<branch>~review.md
+#
+# Install by symlinking onto your PATH, e.g.:
+#   ln -s "$PWD/bin/claudeview-session" ~/.local/bin/
+
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+# shellcheck source=hooks/claudeview-lib.sh
+source "$(dirname "$(dirname "$self")")/hooks/claudeview-lib.sh"
+
+cv_session_key "$PWD"

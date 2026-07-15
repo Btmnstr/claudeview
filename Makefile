@@ -27,7 +27,8 @@ RUN := docker compose run --rm \
          tools
 
 # Every hand-written shell script, formatted and linted as a set.
-SHELL_FILES := bin/claudeview-open hooks/claudeview-push \
+SHELL_FILES := bin/claudeview-open bin/claudeview-session \
+               hooks/claudeview-push hooks/claudeview-lib.sh \
                githooks/pre-commit githooks/pre-push
 
 .PHONY: help

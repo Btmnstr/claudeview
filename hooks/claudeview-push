@@ -6,12 +6,12 @@
 #   claudeview-push plan          # PreToolUse, matcher = ExitPlanMode
 #   claudeview-push last-message  # Stop
 #
-# The tab is named after the session's project, so a viewer shared by several
-# sessions shows "ClaudeView", "otherproject", … instead of a single
-# "last-message" they all clobber. Plans get a "-plan" suffix so they sit beside
-# the wrap-up rather than overwriting it. The project is derived via git (so a
-# bare-repo + worktree layout reports the repo, not the branch-named worktree
-# dir), falling back to basename(.cwd) outside any git repo.
+# Tabs are named <session>~<doc>, where <session> is <repo>~<branch> (from git,
+# so a bare-repo + worktree layout reports the repo, not the branch-named worktree
+# dir) or <topic>~<sid> outside a repo. The viewer groups by <session>, so a
+# session's plan and summary sit together and different branches stay apart. The
+# "~" delimiter is reserved: git forbids it in branch names and cv_clean strips it
+# from every component.
 #
 # Delivery target (optional — a sensible local default is used otherwise):
 #   CLAUDEVIEW_URL=http://host:4790   -> HTTP POST      (remote / home-lab)
@@ -25,53 +25,33 @@ set -euo pipefail
 mode="${1:-last-message}"
 payload="$(cat)"
 
-# The human name of a session's project. In a normal checkout that is the repo
-# directory; in a bare-repo + worktree layout basename(cwd) would be the branch
-# ("master"), so we ask git for the shared repo dir and name it from there:
-#   <repo>/.git      -> <repo>        (ordinary repo or its linked worktrees)
-#   <repo>.git       -> <repo>        (bare repo, and worktrees checked out of it)
-#   <project>/.bare  -> <project>     (the ".bare" worktree layout)
-# Outside any git repo, fall back to basename(cwd).
-project_name() {
-  local dir="${1:-$PWD}" common base
-  [ -n "$dir" ] || dir="$PWD"
-  if common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
-    base="$(basename "$common")"
-    case "$base" in
-      .git | .bare) basename "$(dirname "$common")" ;;
-      *.git) basename "$base" .git ;;
-      *) printf '%s\n' "$base" ;;
-    esac
-  else
-    basename "${dir:-claude}"
-  fi
-}
+# The session key groups this session's documents in the viewer: <repo>~<branch>
+# in a git repo, else <topic>~<sid>. The identity helpers live in a shared lib so
+# the hook and bin/claudeview-session can never derive different keys. readlink -f
+# resolves the real path whether the hook runs directly or via a symlink.
+# shellcheck source=hooks/claudeview-lib.sh
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/claudeview-lib.sh"
 
-# Which session wrote this — reads far better than a session UUID, and gives
-# each project its own tab. Keep the result filesystem-safe.
 cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty')"
-project="$(project_name "$cwd")"
-project="${project//[^A-Za-z0-9_.-]/_}"
 
-# Two sessions in the *same* project would otherwise share one tab (e.g. two
-# worktrees of a bare repo both resolve to <repo>). A short slice of the session
-# id keeps them apart: "ClaudeView-a3f9". Set CLAUDEVIEW_SID_CHARS=0 to drop the
-# tail when you only ever run one session per project.
+# Outside a git repo there is no branch, so a short slice of the session id keeps
+# same-directory sessions apart (CLAUDEVIEW_SID_CHARS=0 drops it). In a repo the
+# branch is the identity and the sid is unused — same-branch sessions group.
 sid="$(printf '%s' "$payload" | jq -r '.session_id // empty')"
 sid="${sid//-/}"
 sid_chars="${CLAUDEVIEW_SID_CHARS:-4}"
-if [ "$sid_chars" -gt 0 ] && [ -n "$sid" ]; then
-  project="${project}-${sid:0:$sid_chars}"
-fi
+[ "$sid_chars" -gt 0 ] && sid="${sid:0:$sid_chars}" || sid=""
+
+session="$(cv_session_key "$cwd" "$sid")"
 
 case "$mode" in
   plan)
-    tab="${project}-plan"
+    tab="${session}~plan"
     md="$(printf '%s' "$payload" | jq -r '.tool_input.plan // empty')"
     ;;
 
   last-message)
-    tab="$project"
+    tab="${session}~summary"
     # The Stop hook can fire while Claude Code is still flushing the turn's final
     # message to the transcript; read too early and we mirror the previous
     # (lead-in) block instead of the real answer. Settle briefly so the last
