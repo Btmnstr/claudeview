@@ -19,8 +19,16 @@ url="${CLAUDEVIEW_URL:-http://localhost:4790}"
 pos="${CLAUDEVIEW_POS:-0,0}"
 profile="${CLAUDEVIEW_PROFILE:-$HOME/.claudeview-profile}"
 
-for candidate in google-chrome google-chrome-stable chromium chromium-browser brave-browser; do
-  if command -v "$candidate" >/dev/null 2>&1; then
+# PATH names first (Linux), then the fixed macOS bundle paths (Chrome et al. are
+# never on PATH there). All are Chromium-family, so the exec block below — with
+# its --app / --user-data-dir / window flags — is identical whichever we find.
+for candidate in \
+  google-chrome google-chrome-stable chromium chromium-browser brave-browser \
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" \
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"; do
+  if command -v "$candidate" >/dev/null 2>&1 || [ -x "$candidate" ]; then
     browser="$candidate"
     break
   fi
