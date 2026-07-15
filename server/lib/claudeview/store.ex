@@ -6,12 +6,11 @@ defmodule Claudeview.Store do
   broadcasts `:changed` to every subscribed process, which is all the viewer
   needs to know it should re-fetch `/content`.
 
-  When a *session-shaped* tab (name ending in `-<hex>`, e.g. `ClaudeView-7f18`)
+  When a *summary* tab (name ending in `~summary`, e.g. `ClaudeView~main~summary`)
   is rewritten within `join_window_s` of its previous write, the new HTML is
-  appended below the old instead of replacing it. Rapid successive writes to the
-  same session tab — an implementation summary then a final summary moments
-  later — would otherwise clobber each other, since the second overwrites the
-  first on disk before it can be read.
+  appended below the old instead of replacing it. The Stop hook's settle race can
+  write an implementation summary then a final summary moments apart; without the
+  join the second would clobber the first before it is read.
   """
 
   use GenServer
@@ -41,7 +40,7 @@ defmodule Claudeview.Store do
       tabs: %{},
       subs: MapSet.new(),
       join_window_s: Keyword.get(opts, :join_window_s, 120),
-      join_pattern: Keyword.get(opts, :join_pattern, ~r/-[0-9a-f]{4,}$/i)
+      join_pattern: Keyword.get(opts, :join_pattern, ~r/~summary$/)
     }
 
     {:ok, state}
@@ -73,8 +72,8 @@ defmodule Claudeview.Store do
     {:noreply, update_in(state.subs, &MapSet.delete(&1, pid))}
   end
 
-  # Join only a fresh write (strictly newer mtime) to a session-shaped tab that
-  # was last written within the window. The strict `>` keeps a Watcher restart —
+  # Join only a fresh write (strictly newer mtime) to a joinable tab that was
+  # last written within the window. The strict `>` keeps a Watcher restart —
   # which re-observes every file at its unchanged mtime — from duplicating content.
   defp join?(nil, _mtime, _tab, _state), do: false
 

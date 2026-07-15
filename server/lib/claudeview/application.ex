@@ -43,10 +43,11 @@ defmodule Claudeview.Application do
   end
 
   # Tab names matching this pattern have rapid rewrites joined rather than
-  # replaced. Default: session-shaped names ending in `-<hex>` (e.g. `-7f18`).
+  # replaced. Default: the auto-generated `~summary` tab, whose Stop-hook settle
+  # race can write twice moments apart. Plan and manual docs replace on rewrite.
   defp join_pattern do
     case System.get_env("JOIN_PATTERN") do
-      nil -> ~r/-[0-9a-f]{4,}$/i
+      nil -> ~r/~summary$/
       source -> Regex.compile!(source)
     end
   end

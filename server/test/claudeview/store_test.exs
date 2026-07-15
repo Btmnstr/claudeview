@@ -6,7 +6,7 @@ defmodule Claudeview.StoreTest do
   alias Claudeview.Store
 
   # The application already supervises a Store started with production defaults
-  # (120s window, `-<hex>$` session pattern). Each test uses a distinct tab name
+  # (120s window, `~summary$` join pattern). Each test uses a distinct tab name
   # so they stay independent of order and of that shared state.
 
   # `snapshot/0` is a call, so it flushes the preceding `put/3` casts: reading it
@@ -15,22 +15,22 @@ defmodule Claudeview.StoreTest do
     Store.snapshot()[tab].html
   end
 
-  test "a rapid rewrite of a session tab is joined below the previous write" do
-    Store.put("join-7f18", "FIRST", 100)
-    Store.put("join-7f18", "SECOND", 150)
+  test "a rapid rewrite of a summary tab is joined below the previous write" do
+    Store.put("proj~main~summary", "FIRST", 100)
+    Store.put("proj~main~summary", "SECOND", 150)
 
-    assert html("join-7f18") =~ ~r/FIRST.*<hr class="cv-join">.*SECOND/s
+    assert html("proj~main~summary") =~ ~r/FIRST.*<hr class="cv-join">.*SECOND/s
   end
 
   test "a rewrite past the window replaces instead of joining" do
-    Store.put("window-aaaa", "FIRST", 100)
-    Store.put("window-aaaa", "SECOND", 300)
+    Store.put("proj~dev~summary", "FIRST", 100)
+    Store.put("proj~dev~summary", "SECOND", 300)
 
-    assert html("window-aaaa") == "SECOND"
+    assert html("proj~dev~summary") == "SECOND"
   end
 
-  test "a non-session tab always replaces, even within the window" do
-    for tab <- ["welcome", "notes-plan"] do
+  test "a non-summary tab always replaces, even within the window" do
+    for tab <- ["welcome", "proj~main~plan", "proj~main~review"] do
       Store.put(tab, "FIRST", 100)
       Store.put(tab, "SECOND", 150)
       assert html(tab) == "SECOND"
@@ -38,9 +38,9 @@ defmodule Claudeview.StoreTest do
   end
 
   test "an equal mtime replaces — a watcher restart re-observing files must not duplicate" do
-    Store.put("equal-bbbb", "FIRST", 100)
-    Store.put("equal-bbbb", "FIRST", 100)
+    Store.put("proj~equal~summary", "FIRST", 100)
+    Store.put("proj~equal~summary", "FIRST", 100)
 
-    assert html("equal-bbbb") == "FIRST"
+    assert html("proj~equal~summary") == "FIRST"
   end
 end

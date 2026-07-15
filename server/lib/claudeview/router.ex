@@ -119,8 +119,10 @@ defmodule Claudeview.Router do
     Map.get(@content_types, ext, "application/octet-stream")
   end
 
+  # `~` is kept: it is the reserved session/doc delimiter in tab names, and the
+  # local and HTTP push paths must agree on it or a remote push would be mangled.
   defp safe_name(name) do
-    name |> Path.basename() |> String.replace(~r/[^A-Za-z0-9_.-]/, "_")
+    name |> Path.basename() |> String.replace(~r/[^A-Za-z0-9_.~-]/, "_")
   end
 
   # Server-Sent Events: block until the store signals a change, then ping the
