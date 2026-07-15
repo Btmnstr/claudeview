@@ -194,6 +194,14 @@ html, body {
   border-color: var(--accent);
 }
 
+/* The live plan tab is the newest plan from any session, not a project of its
+   own (during plan mode Claude can only write the harness's slug file). A dashed
+   border marks it as provisional until the hook files it under its session. */
+.tab.live-plan {
+  border-style: dashed;
+  font-style: italic;
+}
+
 /* Split-button: the group label (`.tab`) and its dropdown caret (`.tab-caret`)
    read as one control, so their touching corners are squared off. */
 

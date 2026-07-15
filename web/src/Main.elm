@@ -7,10 +7,10 @@ tabs, already rendered to HTML by the server, plus the directories being watched
 and shows the tab the server marks as focused — the most recently modified one.
 Clicking a tab pins it until the next content change.
 
-Tabs share a naming convention (`<project>-<sid>[-<type>]`), so the viewer folds
-them into one split-button per project: the button jumps to that project's newest
-document, and a dropdown reaches the older ones. The first `-`-delimited segment
-is the group key.
+Tabs are named `<session>~<doc>` (session is `<repo>~<branch>`), so the viewer
+folds them into one split-button per session: the button jumps to that session's
+newest document, and a dropdown reaches the older ones. The part before the last
+`~` is the group key, matched case-insensitively.
 
 A slim header shows what the server is watching, the document on screen, and
 whether the live connection is up, so an empty screen still tells you where to look.
@@ -164,20 +164,58 @@ tabDecoder =
 
 
 type alias Group =
-    { key : String
+    { key : String -- lowercased session — identity and active-matching
+    , label : String -- display form ("repo@branch"), original case
     , tabs : List Tab -- newest-first
     }
 
 
-{-| The project a tab belongs to: everything before the first hyphen.
+{-| The session a tab belongs to: everything before the _last_ `~`. A name with
+no `~` (`plan`, `welcome`) is its own session.
+-}
+sessionPart : String -> String
+sessionPart name =
+    case List.reverse (String.split "~" name) of
+        _ :: session ->
+            if List.isEmpty session then
+                name
+
+            else
+                session |> List.reverse |> String.join "~"
+
+        [] ->
+            name
+
+
+{-| The grouping identity: the session part, lowercased so one project written in
+different cases (`simnavlog` vs `SimNavLog`) folds into a single group.
 -}
 groupKey : String -> String
 groupKey name =
-    name |> String.split "-" |> List.head |> Maybe.withDefault name
+    String.toLower (sessionPart name)
+
+
+{-| The human label for a group: `repo@branch` from a `repo~branch` session, else
+the session verbatim. `@` is display-only — on disk the delimiter is `~`.
+-}
+groupLabel : String -> String
+groupLabel name =
+    case String.split "~" (sessionPart name) of
+        repo :: branch ->
+            if List.isEmpty branch then
+                repo
+
+            else
+                repo ++ "@" ++ String.join "~" branch
+
+        [] ->
+            name
 
 
 {-| Fold the flat tab list into alphabetical groups (a `Dict` orders its keys),
-each group's documents sorted newest-first so the head is the one to jump to.
+each group's documents sorted newest-first so the head is the one to jump to. The
+label is taken from the newest member, so a group reads in whatever case wrote
+most recently.
 -}
 toGroups : List Tab -> List Group
 toGroups tabs =
@@ -186,21 +224,31 @@ toGroups tabs =
             (\t -> Dict.update (groupKey t.name) (\members -> Just (t :: Maybe.withDefault [] members)))
             Dict.empty
         |> Dict.toList
-        |> List.map (\( key, members ) -> { key = key, tabs = List.sortBy (\t -> negate t.mtime) members })
+        |> List.map
+            (\( key, members ) ->
+                let
+                    sorted =
+                        List.sortBy (\t -> negate t.mtime) members
+
+                    label =
+                        sorted |> List.head |> Maybe.map (.name >> groupLabel) |> Maybe.withDefault key
+                in
+                { key = key, label = label, tabs = sorted }
+            )
 
 
-{-| The label for a dropdown entry: the document type after the project prefix
-(`plan`, `research-tabs`), or the whole name when there is no suffix.
+{-| The label for a dropdown entry: the document type after the session prefix
+(`plan`, `summary`, `review`), or the whole name when there is no suffix.
 -}
 docLabel : String -> String
 docLabel name =
-    case String.split "-" name of
-        _ :: rest ->
+    case List.reverse (String.split "~" name) of
+        doc :: rest ->
             if List.isEmpty rest then
                 name
 
             else
-                String.join "-" rest
+                doc
 
         [] ->
             name
@@ -292,13 +340,23 @@ groupView model g =
 
         multi =
             List.length g.tabs > 1
+
+        live =
+            g.key == "plan"
+
+        label =
+            if live then
+                "plan (live)"
+
+            else
+                g.label
     in
     div [ class "tab-group" ]
         [ button
-            [ classList [ ( "tab", True ), ( "active", isActive ) ]
+            [ classList [ ( "tab", True ), ( "active", isActive ), ( "live-plan", live ) ]
             , onClick (Focus (Maybe.withDefault g.key (Maybe.map .name newest)))
             ]
-            [ text g.key ]
+            [ text label ]
         , if multi then
             button [ class "tab-caret", onClick (ToggleGroup g.key) ] [ text "▾" ]
 
