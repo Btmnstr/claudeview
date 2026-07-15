@@ -88,12 +88,18 @@ defmodule Claudeview.Router do
 
   defp web_dir, do: System.get_env("WEB_DIR", "priv/web")
 
-  # Host-facing directories the server is watching. A list so the roadmap's
-  # "NFS mount + local dir" case is a one-line change. The container only knows
-  # /content, so a human-meaningful label is passed in via CLAUDEVIEW_LABEL.
+  # Host-facing description of what the server is watching, one entry per
+  # `WATCH_DIR` spec. A plain directory shows its human label (the container only
+  # knows /content, so `CLAUDEVIEW_LABEL` supplies a meaningful path); a collapsed
+  # `DIR=TAB` spec shows "<tab> tab" instead of its opaque container path.
   defp watching_paths do
-    [System.get_env("CLAUDEVIEW_LABEL") || System.get_env("WATCH_DIR", "content")]
+    System.get_env("WATCH_DIR", "content")
+    |> Claudeview.Watcher.parse_specs()
+    |> Enum.map(&label_spec/1)
   end
+
+  defp label_spec({dir, nil}), do: System.get_env("CLAUDEVIEW_LABEL") || dir
+  defp label_spec({_dir, tab}), do: "#{tab} tab"
 
   @content_types %{
     ".html" => "text/html",
