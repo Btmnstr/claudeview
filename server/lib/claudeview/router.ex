@@ -62,7 +62,7 @@ defmodule Claudeview.Router do
     conn = fetch_query_params(conn)
     tab = safe_name(conn.query_params["tab"] || "push")
     {:ok, body, conn} = read_body(conn)
-    dir = System.get_env("WATCH_DIR", "content")
+    dir = push_dir()
     File.mkdir_p!(dir)
     File.write!(Path.join(dir, tab <> ".md"), body)
     send_resp(conn, 200, "ok\n")
@@ -87,6 +87,16 @@ defmodule Claudeview.Router do
   end
 
   defp web_dir, do: System.get_env("WEB_DIR", "priv/web")
+
+  # Where an HTTP push lands: the first watched directory. WATCH_DIR may list
+  # several specs (e.g. "/content:/plans=plan"), but a push only ever writes the
+  # primary one — the same directory the file-delivery hook writes to.
+  defp push_dir do
+    System.get_env("WATCH_DIR", "content")
+    |> Claudeview.Watcher.parse_specs()
+    |> List.first()
+    |> elem(0)
+  end
 
   # Host-facing description of what the server is watching, one entry per
   # `WATCH_DIR` spec. A plain directory shows its human label (the container only
