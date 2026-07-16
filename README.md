@@ -161,8 +161,9 @@ Add a line like this to your project `CLAUDE.md` (or global `~/.claude/CLAUDE.md
 
 > To display something on the ClaudeView viewer, write it to
 > `~/.claudeview/$(claudeview-session)~<doc>.md`. `claudeview-session` prints this
-> session's `<repo>~<branch>` key, so the document groups with the session's plan
-> and summary under one `repo@branch` tab. `<doc>` names the kind of document —
+> session's `<repo>~<branch>` key, so the document groups with the repo's plan
+> and summary under one `repo` tab (the branch shows in the doc label). `<doc>`
+> names the kind of document —
 > `review`, `research`, `notes`. Reuse a stable `<doc>` so an update replaces that
 > tab instead of spawning a new one.
 
