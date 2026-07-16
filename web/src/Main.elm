@@ -59,6 +59,16 @@ type alias Tab =
     { name : String, html : String, mtime : Int }
 
 
+{-| How the reading pane decides to hold still on a content change. `FollowScroll`
+is the default: unpinned at the top, auto-pinned once you scroll away. A click
+takes manual control (`Pinned`/`Unpinned`) that sticks until you open another doc.
+-}
+type Pin
+    = FollowScroll
+    | Pinned
+    | Unpinned
+
+
 type alias Model =
     { tabs : List Tab
     , focus : Maybe String
@@ -67,7 +77,7 @@ type alias Model =
     , theme : String
     , openGroup : Maybe String -- the group whose dropdown is open, if any
     , now : Int -- POSIX seconds, so the dropdown can say "2h ago"
-    , manualPin : Bool -- the pin icon was clicked to hold the view
+    , pin : Pin -- how the pane holds still: follow scroll, or a manual hold
     , atTop : Bool -- the reading pane is scrolled to the top
     , alerts : Set String -- group keys that gained new content while pinned
     }
@@ -77,17 +87,26 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, manualPin = False, atTop = True, alerts = Set.empty }
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty }
     , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
     )
 
 
-{-| Pinned means the view holds still on a content change: either you clicked the
-pin, or you scrolled off the top (so new output never yanks away what you read).
+{-| Pinned means the view holds still on a content change. A manual hold wins
+outright; otherwise we follow the scroll — pinned once you leave the top, so new
+output never yanks away what you read.
 -}
 isPinned : Model -> Bool
 isPinned model =
-    model.manualPin || not model.atTop
+    case model.pin of
+        Pinned ->
+            True
+
+        Unpinned ->
+            False
+
+        FollowScroll ->
+            not model.atTop
 
 
 
@@ -136,7 +155,7 @@ update msg model =
         Focus name ->
             -- Selecting a document starts unpinned-at-top, closes the menu, and
             -- clears this group's dot (the newest doc is the one it flagged).
-            ( { model | focus = Just name, openGroup = Nothing, manualPin = False, atTop = True, alerts = clearAlert (Just name) model.alerts }, Cmd.none )
+            ( { model | focus = Just name, openGroup = Nothing, pin = FollowScroll, atTop = True, alerts = clearAlert (Just name) model.alerts }, Cmd.none )
 
         ToggleGroup key ->
             ( { model | openGroup = toggle key model.openGroup }, Cmd.none )
@@ -159,7 +178,19 @@ update msg model =
             ( { model | theme = next }, setTheme next )
 
         TogglePin ->
-            ( { model | manualPin = not model.manualPin }, Cmd.none )
+            -- Take manual control of the *effective* state, so a click while
+            -- scrolled can force unpinned — not just add a pin on top of the
+            -- scroll. The choice sticks until another document is opened.
+            ( { model
+                | pin =
+                    if isPinned model then
+                        Unpinned
+
+                    else
+                        Pinned
+              }
+            , Cmd.none
+            )
 
         Scrolled top ->
             ( { model | atTop = top }, Cmd.none )
