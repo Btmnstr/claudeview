@@ -336,6 +336,35 @@ groupLabel name =
     sessionPart name
 
 
+{-| The reserved group key whose tab shows the live plan-mode document.
+-}
+livePlanKey : String
+livePlanKey =
+    "plan"
+
+
+{-| Whether a group holds documents from more than one branch — the cue to prefix
+each dropdown entry with its branch.
+-}
+groupSpansMultipleBranches : Group -> Bool
+groupSpansMultipleBranches group =
+    let
+        branches =
+            group.tabs
+                |> List.map (.name >> branchPart)
+                |> List.filter (\b -> b /= "")
+                |> unique
+    in
+    List.length branches > 1
+
+
+{-| The name of a group's newest document — where its primary button jumps to.
+-}
+newestDocName : Group -> String
+newestDocName group =
+    group.tabs |> List.head |> Maybe.map .name |> Maybe.withDefault group.key
+
+
 {-| Fold the flat tab list into alphabetical groups (a `Dict` orders its keys),
 each group's documents sorted newest-first so the head is the one to jump to. The
 label is taken from the newest member, so a group reads in whatever case wrote
@@ -402,23 +431,9 @@ header model =
         , span [ class "doc-title" ] [ text (Maybe.withDefault "" model.focus) ]
         , span
             [ classList [ ( "status", True ), ( "live", model.connected ) ] ]
-            [ text
-                (if model.connected then
-                    "live"
-
-                 else
-                    "offline"
-                )
-            ]
+            [ text (statusLabel model.connected) ]
         , button [ class "theme-toggle", onClick ToggleTheme ]
-            [ text
-                (if model.theme == "dark" then
-                    "☀ light"
-
-                 else
-                    "☾ dark"
-                )
-            ]
+            [ text (themeToggleLabel model.theme) ]
         ]
 
 
@@ -432,6 +447,24 @@ watchingLabel dirs =
             "watching: " ++ String.join ", " dirs
 
 
+statusLabel : Bool -> String
+statusLabel connected =
+    if connected then
+        "live"
+
+    else
+        "offline"
+
+
+themeToggleLabel : String -> String
+themeToggleLabel theme =
+    if theme == "dark" then
+        "☀ light"
+
+    else
+        "☾ dark"
+
+
 {-| A group is a split-button: the label jumps to the newest document, the caret
 opens a dropdown of the rest. The caret and menu appear only when there is more
 than one document to choose between.
@@ -439,26 +472,14 @@ than one document to choose between.
 groupView : Model -> Group -> Html Msg
 groupView model g =
     let
-        newest =
-            List.head g.tabs
-
         isActive =
             Maybe.map groupKey model.focus == Just g.key
 
         multi =
             List.length g.tabs > 1
 
-        showBranch =
-            (g.tabs
-                |> List.map (.name >> branchPart)
-                |> List.filter (\b -> b /= "")
-                |> unique
-                |> List.length
-            )
-                > 1
-
         live =
-            g.key == "plan"
+            g.key == livePlanKey
 
         label =
             if live then
@@ -466,33 +487,33 @@ groupView model g =
 
             else
                 g.label
-
-        hasDot =
-            Set.member g.key model.alerts
     in
     div [ class "tab-group" ]
         [ button
             [ classList [ ( "tab", True ), ( "active", isActive ), ( "live-plan", live ) ]
-            , onClick (Focus (Maybe.withDefault g.key (Maybe.map .name newest)))
+            , onClick (Focus (newestDocName g))
             ]
             [ text label
-            , if hasDot then
-                span [ class "dot" ] []
-
-              else
-                text ""
+            , viewIf (Set.member g.key model.alerts) (span [ class "dot" ] [])
             ]
-        , if multi then
-            button [ class "tab-caret", onClick (ToggleGroup g.key) ] [ text "▾" ]
-
-          else
-            text ""
-        , if multi && model.openGroup == Just g.key then
-            div [ class "tab-menu" ] (List.map (menuItem model.now showBranch) g.tabs)
-
-          else
-            text ""
+        , viewIf multi (caretButton g.key)
+        , viewIf (multi && model.openGroup == Just g.key)
+            (groupMenu model.now (groupSpansMultipleBranches g) g.tabs)
         ]
+
+
+{-| The caret that opens a group's dropdown of documents.
+-}
+caretButton : String -> Html Msg
+caretButton key =
+    button [ class "tab-caret", onClick (ToggleGroup key) ] [ text "▾" ]
+
+
+{-| The dropdown listing a group's documents newest-first.
+-}
+groupMenu : Int -> Bool -> List Tab -> Html Msg
+groupMenu now showBranch tabs =
+    div [ class "tab-menu" ] (List.map (menuItem now showBranch) tabs)
 
 
 {-| A dropdown entry: the document type, prefixed with its branch only when the
@@ -529,17 +550,24 @@ unique =
         []
 
 
+{-| Render `el` only when `cond` holds, otherwise nothing — the declarative form
+of the repeated `if cond then el else text ""`.
+-}
+viewIf : Bool -> Html msg -> Html msg
+viewIf cond el =
+    if cond then
+        el
+
+    else
+        text ""
+
+
 {-| An invisible full-window layer under any open menu: a click anywhere off the
 menu lands here and closes it.
 -}
 backdrop : Maybe String -> Html Msg
 backdrop open =
-    case open of
-        Just _ ->
-            div [ class "menu-backdrop", onClick CloseMenu ] []
-
-        Nothing ->
-            text ""
+    viewIf (open /= Nothing) (div [ class "menu-backdrop", onClick CloseMenu ] [])
 
 
 contentPane : Model -> Html Msg
