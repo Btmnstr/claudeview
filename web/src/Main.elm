@@ -139,15 +139,14 @@ update msg model =
         Status connected ->
             ( { model | connected = connected }, Cmd.none )
 
-        GotContent (Ok c) ->
-            if isPinned model then
-                -- Hold the reader in place: keep our focus, but refresh the tab
-                -- list and dot any group that gained new content behind the pin.
-                ( { model | tabs = c.tabs, watching = c.watching, alerts = markAlerts model c }, Cmd.none )
+        GotContent (Ok content) ->
+            ( if isPinned model then
+                holdInPlace model content
 
-            else
-                -- Adopt the server's focus (newest-modified) and clear its dot.
-                ( { model | tabs = c.tabs, focus = c.focus, watching = c.watching, alerts = clearAlert c.focus model.alerts }, Cmd.none )
+              else
+                adoptFocus model content
+            , Cmd.none
+            )
 
         GotContent (Err _) ->
             ( model, Cmd.none )
@@ -158,7 +157,7 @@ update msg model =
             ( { model | focus = Just name, openGroup = Nothing, pin = FollowScroll, atTop = True, alerts = clearAlert (Just name) model.alerts }, Cmd.none )
 
         ToggleGroup key ->
-            ( { model | openGroup = toggle key model.openGroup }, Cmd.none )
+            ( { model | openGroup = toggleOpen key model.openGroup }, Cmd.none )
 
         CloseMenu ->
             ( { model | openGroup = Nothing }, Cmd.none )
@@ -196,12 +195,33 @@ update msg model =
             ( { model | atTop = top }, Cmd.none )
 
 
+{-| A content refresh while pinned: hold our focus and scroll, but take the new
+tab list and dot any group that gained content behind the pin.
+-}
+holdInPlace : Model -> Content -> Model
+holdInPlace model content =
+    { model | tabs = content.tabs, watching = content.watching, alerts = markAlerts model content }
+
+
+{-| A content refresh while unpinned: adopt the server's focus (newest-modified)
+and clear that group's dot.
+-}
+adoptFocus : Model -> Content -> Model
+adoptFocus model content =
+    { model
+        | tabs = content.tabs
+        , focus = content.focus
+        , watching = content.watching
+        , alerts = clearAlert content.focus model.alerts
+    }
+
+
 {-| Fold the groups that gained content since our last snapshot into the alert
 set: a tab is fresh when it is new or its mtime bumped, and it is not the doc on
 screen. Only ever called while pinned, so the first load never raises a dot.
 -}
 markAlerts : Model -> Content -> Set String
-markAlerts model c =
+markAlerts model content =
     let
         prev =
             Dict.fromList (List.map (\t -> ( t.name, t.mtime )) model.tabs)
@@ -209,7 +229,7 @@ markAlerts model c =
         isFresh t =
             Dict.get t.name prev /= Just t.mtime
     in
-    c.tabs
+    content.tabs
         |> List.filter isFresh
         |> List.filter (\t -> Just t.name /= model.focus)
         |> List.map (.name >> groupKey)
@@ -228,8 +248,8 @@ clearAlert focus alerts =
             alerts
 
 
-toggle : String -> Maybe String -> Maybe String
-toggle key open =
+toggleOpen : String -> Maybe String -> Maybe String
+toggleOpen key open =
     if open == Just key then
         Nothing
 
@@ -470,35 +490,35 @@ opens a dropdown of the rest. The caret and menu appear only when there is more
 than one document to choose between.
 -}
 groupView : Model -> Group -> Html Msg
-groupView model g =
+groupView model group =
     let
         isActive =
-            Maybe.map groupKey model.focus == Just g.key
+            Maybe.map groupKey model.focus == Just group.key
 
         multi =
-            List.length g.tabs > 1
+            List.length group.tabs > 1
 
         live =
-            g.key == livePlanKey
+            group.key == livePlanKey
 
         label =
             if live then
                 "plan (live)"
 
             else
-                g.label
+                group.label
     in
     div [ class "tab-group" ]
         [ button
             [ classList [ ( "tab", True ), ( "active", isActive ), ( "live-plan", live ) ]
-            , onClick (Focus (newestDocName g))
+            , onClick (Focus (newestDocName group))
             ]
             [ text label
-            , viewIf (Set.member g.key model.alerts) (span [ class "dot" ] [])
+            , viewIf (Set.member group.key model.alerts) (span [ class "dot" ] [])
             ]
-        , viewIf multi (caretButton g.key)
-        , viewIf (multi && model.openGroup == Just g.key)
-            (groupMenu model.now (groupSpansMultipleBranches g) g.tabs)
+        , viewIf multi (caretButton group.key)
+        , viewIf (multi && model.openGroup == Just group.key)
+            (groupMenu model.now (groupSpansMultipleBranches group) group.tabs)
         ]
 
 
@@ -520,18 +540,18 @@ groupMenu now showBranch tabs =
 group actually spans more than one branch (so single-branch repos stay uncluttered).
 -}
 menuItem : Int -> Bool -> Tab -> Html Msg
-menuItem now showBranch t =
+menuItem now showBranch tab =
     let
         entry =
-            if showBranch && branchPart t.name /= "" then
-                branchPart t.name ++ " / " ++ docPart t.name
+            if showBranch && branchPart tab.name /= "" then
+                branchPart tab.name ++ " / " ++ docPart tab.name
 
             else
-                docPart t.name
+                docPart tab.name
     in
-    button [ class "tab-menu-item", onClick (Focus t.name) ]
+    button [ class "tab-menu-item", onClick (Focus tab.name) ]
         [ span [ class "doc" ] [ text entry ]
-        , span [ class "ago" ] [ text (relative now t.mtime) ]
+        , span [ class "ago" ] [ text (relative now tab.mtime) ]
         ]
 
 
@@ -572,8 +592,8 @@ backdrop open =
 
 contentPane : Model -> Html Msg
 contentPane model =
-    case List.filter (\t -> Just t.name == model.focus) model.tabs of
-        t :: _ ->
+    case List.filter (\tab -> Just tab.name == model.focus) model.tabs of
+        tab :: _ ->
             -- The pin sits fixed over the top-left of the scrolling body, so it
             -- rides in a positioned wrapper rather than inside `raw-html` itself.
             -- `<raw-html>` is a custom element (see index.html) that renders the
@@ -583,8 +603,8 @@ contentPane model =
                 [ pinButton model
                 , node "raw-html"
                     [ class "content"
-                    , property "docName" (E.string t.name)
-                    , property "content" (E.string t.html)
+                    , property "docName" (E.string tab.name)
+                    , property "content" (E.string tab.html)
                     ]
                     []
                 ]
