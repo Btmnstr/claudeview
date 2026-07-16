@@ -31,10 +31,18 @@
         this._scrolls = new Map();   // doc name -> scrollTop, this session only
         this._doc = null;
         // Continuously record the displayed document's position, so the outgoing
-        // one is already saved by the time we switch away.
+        // one is already saved by the time we switch away, and tell Elm whether we
+        // are at the top so it can auto-pin the reader off the top.
         this.addEventListener("scroll", () => {
           if (this._doc !== null) this._scrolls.set(this._doc, this.scrollTop);
+          this._reportTop();
         });
+      }
+
+      // `app` is the hoisted Elm handle below; guarded because the first content
+      // apply can run before it is assigned.
+      _reportTop() {
+        if (app && app.ports.scrollState) app.ports.scrollState.send(this.scrollTop <= 8);
       }
 
       set docName(value) { this._nextDoc = value; this._schedule(); }
@@ -58,6 +66,9 @@
             this._doc = this._nextDoc;
             this.scrollTop = this._scrolls.get(this._doc) || 0;
           }
+          // Report after applying, so restoring a scrolled doc re-pins it and a
+          // fresh top-of-doc reports unpinned.
+          this._reportTop();
         });
       }
     });

@@ -202,6 +202,18 @@ html, body {
   font-style: italic;
 }
 
+/* New content arrived in this group while the view was pinned. Cleared on the
+   first view of the new document (clicking the group opens it). */
+.tab .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #e5484d;
+  vertical-align: middle;
+}
+
 /* Split-button: the group label (`.tab`) and its dropdown caret (`.tab-caret`)
    read as one control, so their touching corners are squared off. */
 
@@ -282,6 +294,47 @@ html, body {
 
 /* Content pane — the reading surface. Prose is capped to a comfortable
    measure and centred; wide code and tables scroll within it. */
+
+/* Positioned host for the pin, which stays put while `.content` scrolls inside. */
+.content-pane {
+  position: relative;
+  flex: 1;
+  min-height: 0;   /* let the inner scroller shrink within the flex column */
+  display: flex;
+  flex-direction: column;
+}
+
+.content-pane > .content {
+  flex: 1;
+}
+
+/* The pin toggle, anchored to the body's top-left, clear of the centred prose.
+   Faint and grey when unpinned; full-colour with an accent ring when pinned. */
+.content-pane .pin {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 5;
+  font-size: 0.9em;
+  line-height: 1;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.content-pane .pin:hover {
+  opacity: 0.7;
+}
+
+.content-pane .pin.pinned {
+  opacity: 1;
+  filter: none;
+  border-color: var(--accent);
+}
 
 .content {
   flex: 1;

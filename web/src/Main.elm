@@ -22,11 +22,12 @@ whether the live connection is up, so an empty screen still tells you where to l
 import Browser
 import Dict
 import Html exposing (Html, button, div, node, span, text)
-import Html.Attributes exposing (class, classList, property)
+import Html.Attributes exposing (class, classList, property, title)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as D
 import Json.Encode as E
+import Set exposing (Set)
 import Task
 import Time
 
@@ -42,6 +43,12 @@ port sseStatus : (Bool -> msg) -> Sub msg
 
 
 port setTheme : String -> Cmd msg
+
+
+{-| The `raw-html` element reports whether its scroll sits at the top, so the
+model can auto-pin the moment you scroll away and unpin when you return.
+-}
+port scrollState : (Bool -> msg) -> Sub msg
 
 
 
@@ -60,6 +67,9 @@ type alias Model =
     , theme : String
     , openGroup : Maybe String -- the group whose dropdown is open, if any
     , now : Int -- POSIX seconds, so the dropdown can say "2h ago"
+    , manualPin : Bool -- the pin icon was clicked to hold the view
+    , atTop : Bool -- the reading pane is scrolled to the top
+    , alerts : Set String -- group keys that gained new content while pinned
     }
 
 
@@ -67,9 +77,17 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0 }
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, manualPin = False, atTop = True, alerts = Set.empty }
     , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
     )
+
+
+{-| Pinned means the view holds still on a content change: either you clicked the
+pin, or you scrolled off the top (so new output never yanks away what you read).
+-}
+isPinned : Model -> Bool
+isPinned model =
+    model.manualPin || not model.atTop
 
 
 
@@ -89,6 +107,8 @@ type Msg
     | CloseMenu
     | Tick Time.Posix
     | ToggleTheme
+    | TogglePin
+    | Scrolled Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -101,14 +121,22 @@ update msg model =
             ( { model | connected = connected }, Cmd.none )
 
         GotContent (Ok c) ->
-            ( { model | tabs = c.tabs, focus = c.focus, watching = c.watching }, Cmd.none )
+            if isPinned model then
+                -- Hold the reader in place: keep our focus, but refresh the tab
+                -- list and dot any group that gained new content behind the pin.
+                ( { model | tabs = c.tabs, watching = c.watching, alerts = markAlerts model c }, Cmd.none )
+
+            else
+                -- Adopt the server's focus (newest-modified) and clear its dot.
+                ( { model | tabs = c.tabs, focus = c.focus, watching = c.watching, alerts = clearAlert c.focus model.alerts }, Cmd.none )
 
         GotContent (Err _) ->
             ( model, Cmd.none )
 
         Focus name ->
-            -- Selecting a document (button or dropdown item) also closes the menu.
-            ( { model | focus = Just name, openGroup = Nothing }, Cmd.none )
+            -- Selecting a document starts unpinned-at-top, closes the menu, and
+            -- clears this group's dot (the newest doc is the one it flagged).
+            ( { model | focus = Just name, openGroup = Nothing, manualPin = False, atTop = True, alerts = clearAlert (Just name) model.alerts }, Cmd.none )
 
         ToggleGroup key ->
             ( { model | openGroup = toggle key model.openGroup }, Cmd.none )
@@ -129,6 +157,44 @@ update msg model =
                         "dark"
             in
             ( { model | theme = next }, setTheme next )
+
+        TogglePin ->
+            ( { model | manualPin = not model.manualPin }, Cmd.none )
+
+        Scrolled top ->
+            ( { model | atTop = top }, Cmd.none )
+
+
+{-| Fold the groups that gained content since our last snapshot into the alert
+set: a tab is fresh when it is new or its mtime bumped, and it is not the doc on
+screen. Only ever called while pinned, so the first load never raises a dot.
+-}
+markAlerts : Model -> Content -> Set String
+markAlerts model c =
+    let
+        prev =
+            Dict.fromList (List.map (\t -> ( t.name, t.mtime )) model.tabs)
+
+        isFresh t =
+            Dict.get t.name prev /= Just t.mtime
+    in
+    c.tabs
+        |> List.filter isFresh
+        |> List.filter (\t -> Just t.name /= model.focus)
+        |> List.map (.name >> groupKey)
+        |> List.foldl Set.insert model.alerts
+
+
+{-| Drop the dot for the group a focused document belongs to — it has been seen.
+-}
+clearAlert : Maybe String -> Set String -> Set String
+clearAlert focus alerts =
+    case focus of
+        Just name ->
+            Set.remove (groupKey name) alerts
+
+        Nothing ->
+            alerts
 
 
 toggle : String -> Maybe String -> Maybe String
@@ -369,13 +435,22 @@ groupView model g =
 
             else
                 g.label
+
+        hasDot =
+            Set.member g.key model.alerts
     in
     div [ class "tab-group" ]
         [ button
             [ classList [ ( "tab", True ), ( "active", isActive ), ( "live-plan", live ) ]
             , onClick (Focus (Maybe.withDefault g.key (Maybe.map .name newest)))
             ]
-            [ text label ]
+            [ text label
+            , if hasDot then
+                span [ class "dot" ] []
+
+              else
+                text ""
+            ]
         , if multi then
             button [ class "tab-caret", onClick (ToggleGroup g.key) ] [ text "▾" ]
 
@@ -440,19 +515,43 @@ contentPane : Model -> Html Msg
 contentPane model =
     case List.filter (\t -> Just t.name == model.focus) model.tabs of
         t :: _ ->
+            -- The pin sits fixed over the top-left of the scrolling body, so it
+            -- rides in a positioned wrapper rather than inside `raw-html` itself.
             -- `<raw-html>` is a custom element (see index.html) that renders the
             -- server-produced HTML string, keeping this Elm code free of markdown.
             -- `docName` names the document so the element can remember its scroll.
-            node "raw-html"
-                [ class "content"
-                , property "docName" (E.string t.name)
-                , property "content" (E.string t.html)
+            div [ class "content-pane" ]
+                [ pinButton model
+                , node "raw-html"
+                    [ class "content"
+                    , property "docName" (E.string t.name)
+                    , property "content" (E.string t.html)
+                    ]
+                    []
                 ]
-                []
 
         [] ->
             div [ class "content empty" ]
                 [ text (emptyMessage model.watching) ]
+
+
+{-| The pin toggle, fixed to the body's top-left. Bright when the view is held,
+faint otherwise; the tooltip explains both how it got there and how to change it.
+-}
+pinButton : Model -> Html Msg
+pinButton model =
+    button
+        [ classList [ ( "pin", True ), ( "pinned", isPinned model ) ]
+        , onClick TogglePin
+        , title
+            (if isPinned model then
+                "Pinned — new documents won't steal the view. Click to unpin."
+
+             else
+                "Unpinned. Click to pin, or scroll down to pin automatically."
+            )
+        ]
+        [ text "📌" ]
 
 
 emptyMessage : List String -> String
@@ -474,6 +573,7 @@ subscriptions _ =
     Sub.batch
         [ sseMessage Ping
         , sseStatus Status
+        , scrollState Scrolled
         , Time.every 60000 Tick
         ]
 
