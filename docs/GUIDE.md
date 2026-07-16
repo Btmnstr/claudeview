@@ -174,18 +174,26 @@ clears the dot.
 
 ### Tabs and session grouping
 
-Tabs are grouped by session: **`<repo>~<branch>`**. The hook names each tab
-`<session>~<doc>`, where the session is `<repo>~<branch>` (the git repo — so a
-bare-repo + worktree layout reports the repo, not the branch-named worktree — and
-the checked-out branch), or `<topic>~<sid>` outside a repo. The viewer groups on
-the session and shows it as `repo@branch`, so a session's `plan`, `summary` and
-manual docs sit under one tab and different branches stay apart.
+The hook names each tab **`<repo>~<branch>~<doc>`**: the git repo (a bare-repo +
+worktree layout reports the repo, not the branch-named worktree), the checked-out
+branch, and the kind of document. Outside a repo the session is `<topic>~<sid>`,
+so same-directory sessions stay apart.
+
+The viewer folds those into **one split-button per repo**, keyed on the first
+`~`-segment and matched case-insensitively (`SimNavLog` and `simnavlog` are one
+group). The button jumps to that repo's newest document and the caret reaches the
+rest — so a repo's `plan`, `summary` and manual docs sit together across *all* its
+branches, rather than fragmenting into a group per branch. The branch moves into
+the dropdown labels, shown only when a repo has more than one branch in play.
 
 The `~` delimiter is reserved: git forbids it in branch names, and each component
-is sanitized, so a repo or branch containing hyphens never mis-splits. Manual
-`Write`s reuse the exact key via `bin/claudeview-session`; outside a git repo it
-prints just the directory name, so supply your own `<intention>~<doc>` in that
-case.
+is sanitized, so a repo or branch containing hyphens never mis-splits. A name with
+no `~` at all falls back to the older rule — the segment before the first `-` — so
+tabs written before the `~` grammar still group.
+
+Manual `Write`s reuse the exact key via `bin/claudeview-session`; outside a git
+repo it prints just the directory name, so supply your own `<intention>~<doc>` in
+that case.
 
 ### Diagrams and images
 

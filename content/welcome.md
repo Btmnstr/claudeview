@@ -20,7 +20,7 @@ newest is shown automatically. Two things feed it, and both need a one-time wire
       writing a tab.
 - [ ] **Expose `claudeview-session`** — `ln -s "$PWD/bin/claudeview-session"
       ~/.local/bin/`, so a manual `Write` groups with the hook's tabs under one
-      `repo@branch`.
+      `repo` tab.
 - [ ] **Teach Claude the convention** — add the tab-writing line (below) to your
       project or global `CLAUDE.md`.
 - [ ] **Restart Claude Code** — hooks are read at session start.

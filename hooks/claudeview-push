@@ -8,10 +8,10 @@
 #
 # Tabs are named <session>~<doc>, where <session> is <repo>~<branch> (from git,
 # so a bare-repo + worktree layout reports the repo, not the branch-named worktree
-# dir) or <topic>~<sid> outside a repo. The viewer groups by <session>, so a
-# session's plan and summary sit together and different branches stay apart. The
-# "~" delimiter is reserved: git forbids it in branch names and cv_clean strips it
-# from every component.
+# dir) or <topic>~<sid> outside a repo. The viewer groups by <repo> — the first
+# "~" segment — so a repo's plan and summary sit together across its branches, and
+# the branch shows in the document label. The "~" delimiter is reserved: git
+# forbids it in branch names and cv_clean strips it from every component.
 #
 # Delivery target (optional — a sensible local default is used otherwise):
 #   CLAUDEVIEW_URL=http://host:4790   -> HTTP POST      (remote / home-lab)
