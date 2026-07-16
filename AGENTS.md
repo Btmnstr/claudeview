@@ -53,7 +53,7 @@ Tests: `server/test/` (ExUnit). Run with `... tools sh -c 'cd server && mix test
 `mix test` boots the app, so the supervised `Store` is already running — reuse it
 with unique tab names rather than `start_supervised` (which collides on the name).
 
-## Config (server env vars — see README "Configuration")
+## Config (server env vars — see docs/GUIDE.md "Configuration")
 
 `PORT` `WATCH_DIR` `POLL_MS` `JOIN_WINDOW_S` (120) `JOIN_PATTERN` (`~summary$`)
 `CLAUDEVIEW_LABEL` `WEB_DIR` `CLAUDEVIEW_SEED`. `config/config.exs` is intentionally empty.

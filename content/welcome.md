@@ -61,4 +61,6 @@ curl -X POST 'http://localhost:4790/push?tab=note' \
   the group to jump to it.
 
 > Blockquotes, tables, task lists, highlighted code and diagrams are all themed
-> for a portrait monitor. See the project README for the full tour.
+> for a portrait monitor. See the
+> [project guide](https://github.com/Btmnstr/claudeview/blob/main/docs/GUIDE.md)
+> for the full tour.
