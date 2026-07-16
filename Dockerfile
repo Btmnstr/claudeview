@@ -46,8 +46,12 @@ RUN mix compile
 COPY web/index.html web/theme.css ./priv/web/
 COPY web/JetBrainsMono-Regular.woff2 web/JetBrainsMono-Bold.woff2 ./priv/web/
 COPY --from=elm /web/elm.js ./priv/web/elm.js
+# The setup guide, seeded into an empty watch dir on first run (see Watcher).
+# Outside priv/web, so it is seeded, not served.
+COPY content/welcome.md ./priv/welcome.md
 ENV WEB_DIR=/app/priv/web \
     WATCH_DIR=/content \
+    CLAUDEVIEW_SEED=/app/priv/welcome.md \
     PORT=4790 \
     POLL_MS=1000
 EXPOSE 4790

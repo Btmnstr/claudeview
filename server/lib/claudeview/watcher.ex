@@ -37,7 +37,24 @@ defmodule Claudeview.Watcher do
     tab = Keyword.get(opts, :tab)
     poll_ms = Keyword.get(opts, :poll_ms, 1000)
     File.mkdir_p!(dir)
+    if is_nil(tab), do: maybe_seed(dir)
     {:ok, scan(%{dir: dir, tab: tab, poll_ms: poll_ms, seen: %{}})}
+  end
+
+  # A fresh watch dir shows nothing; drop the welcome/setup guide in so a new
+  # server greets you with the remaining steps. Only when no `*.md` exists yet, so
+  # your own content is never clobbered (it reappears only if you empty the
+  # directory again). `CLAUDEVIEW_SEED` points at the image-baked copy; unset
+  # (local dev, whose default `content/` already holds it) means no seed.
+  defp maybe_seed(dir) do
+    seed = System.get_env("CLAUDEVIEW_SEED")
+
+    if seed && File.exists?(seed) && Path.wildcard(Path.join(dir, "*.md")) == [] do
+      case File.cp(seed, Path.join(dir, Path.basename(seed))) do
+        :ok -> Logger.info("Seeded #{dir} with #{Path.basename(seed)}")
+        {:error, reason} -> Logger.warning("Could not seed #{dir}: #{inspect(reason)}")
+      end
+    end
   end
 
   @impl true
