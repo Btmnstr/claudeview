@@ -19,15 +19,7 @@ defmodule Claudeview.Router do
   # can never escape it (flat layout — images live directly in the watch dir).
   get "/media/:name" do
     dir = System.get_env("WATCH_DIR", "content")
-    path = Path.join(dir, safe_name(name))
-
-    if File.exists?(path) do
-      conn
-      |> put_resp_content_type(content_type(path))
-      |> send_file(200, path)
-    else
-      send_resp(conn, 404, "not found\n")
-    end
+    send_static(conn, Path.join(dir, safe_name(name)))
   end
 
   get "/content" do
@@ -69,22 +61,29 @@ defmodule Claudeview.Router do
   end
 
   match _ do
-    send_resp(conn, 404, "not found\n")
+    not_found(conn)
   end
 
   # Static assets
 
   defp serve(conn, name) do
-    path = Path.join(web_dir(), Path.basename(name))
+    send_static(conn, Path.join(web_dir(), Path.basename(name)))
+  end
 
+  # Serve a file under its content type, or 404 when it is absent. The two static
+  # routes — assets from web_dir, author images from the watch dir — differ only
+  # in how they build `path`, so the send/404 shape lives here once.
+  defp send_static(conn, path) do
     if File.exists?(path) do
       conn
       |> put_resp_content_type(content_type(path))
       |> send_file(200, path)
     else
-      send_resp(conn, 404, "not found\n")
+      not_found(conn)
     end
   end
+
+  defp not_found(conn), do: send_resp(conn, 404, "not found\n")
 
   defp web_dir, do: System.get_env("WEB_DIR", "priv/web")
 

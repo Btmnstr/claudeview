@@ -100,19 +100,16 @@ defmodule Claudeview.Render do
   # non-zero exit or a missing binary yields nil, and the caller keeps the plain
   # block. `build_args` maps {in_path, out_path} to the renderer's argv.
   defp svg_via_files(cmd, build_args, source) do
-    in_path = tmp_path()
     out_path = tmp_path()
-    File.write!(in_path, source)
 
     try do
-      case System.cmd(cmd, build_args.(in_path, out_path), stderr_to_stdout: true) do
-        {_, 0} -> strip_to_svg(File.read!(out_path))
-        _ -> nil
-      end
-    rescue
-      _ -> nil
+      with_temp_input(source, fn in_path ->
+        case System.cmd(cmd, build_args.(in_path, out_path), stderr_to_stdout: true) do
+          {_, 0} -> strip_to_svg(File.read!(out_path))
+          _ -> nil
+        end
+      end)
     after
-      File.rm(in_path)
       File.rm(out_path)
     end
   end
@@ -131,16 +128,26 @@ defmodule Claudeview.Render do
   # file. A non-zero exit — or a missing chroma — yields nil and the caller keeps
   # the plain block: highlighting is a nicety, never load-bearing.
   defp chroma(lexer, code) do
-    path = tmp_path()
-    File.write!(path, code)
-
-    try do
+    with_temp_input(code, fn path ->
       args = ["--lexer", lexer, "--html", "--html-only", "--html-tab-width", "2", path]
 
       case System.cmd("chroma", args, stderr_to_stdout: true) do
         {out, 0} -> out
         _ -> nil
       end
+    end)
+  end
+
+  # Write `source` to a temp file and hand its path to `run`, always removing the
+  # file afterward. `run` returns the rendered string, or nil to fall back to the
+  # verbatim block; an exception (a missing binary) is nil too. Both external
+  # renderers build on this, so the best-effort temp-file shape lives in one place.
+  defp with_temp_input(source, run) do
+    path = tmp_path()
+    File.write!(path, source)
+
+    try do
+      run.(path)
     rescue
       _ -> nil
     after
