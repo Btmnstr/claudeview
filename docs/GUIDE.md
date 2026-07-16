@@ -17,7 +17,7 @@ start, hook wiring and permissions all apply unchanged:
 - Docker Desktop with the WSL2 backend (or Docker installed inside the distro)
   runs the server; the published port is reachable at `http://localhost:4790`
   from the Windows host.
-- Open the viewer in a **Windows-side** Chrome — `bin/claudeview-open` looks for a
+- Open the viewer in a **Windows-side** browser — `bin/claudeview-open` looks for a
   Linux browser and won't help inside WSL, so use an ordinary window or a Windows
   shortcut to the URL. Rotate to portrait in Windows Display settings.
 
@@ -153,6 +153,15 @@ settings › Display orientation** — there is no command-line equivalent to sc
 
 `bin/claudeview-open` places the window at `0,0` by default; set
 `CLAUDEVIEW_POS="x,y"` to target a monitor that sits elsewhere in your layout.
+
+It takes the first Chromium-family browser it finds: `google-chrome`,
+`google-chrome-stable`, `chromium`, `chromium-browser` or `brave-browser` on
+`PATH`, then the fixed `/Applications` bundle paths for Chrome, Chromium, Brave
+and Edge (on macOS those are never on `PATH`). The family is not a preference —
+the script needs `--app` for the chromeless window and `--window-position` to land
+it on the right monitor, and Firefox offers neither. If Firefox is your browser,
+open `http://localhost:4790` in an ordinary window and full-screen it by hand;
+the viewer itself works the same.
 
 ### Pinning holds your place
 

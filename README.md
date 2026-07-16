@@ -54,9 +54,8 @@ source, never a broken image, so it is safe to lean on. See
   **≥ 2.31** (for `--path-format`); an older git isn't fatal — the session key
   just falls back to the directory name. On macOS `git` and `curl` ship with the
   OS, but `jq` does not (`brew install jq`).
-- A **Chromium-family browser** (`google-chrome`, `chromium`, … on Linux; the
-  `Google Chrome.app` / `Chromium.app` / `Brave`/`Edge` bundles on macOS) for the
-  viewer window; any browser can open the URL, but the launch script wants `--app`.
+- A **browser** — any modern one. The viewer is a plain page; only
+  `bin/claudeview-open` below is Chromium-specific.
 
 On Windows, run Claude Code itself inside WSL2 — see
 [Windows (WSL2)](docs/GUIDE.md#windows-wsl2).
@@ -78,11 +77,18 @@ The viewer listens on **port 4790** by default (chosen to dodge the usual
 3000/4000 collisions). Override the host port with `CLAUDEVIEW_HOST_PORT`, e.g.
 `CLAUDEVIEW_HOST_PORT=5000 docker compose up -d`.
 
-Open the viewer as a dedicated, chromeless, full-screen window:
+Point any browser at `http://localhost:4790` and you have the viewer. To get a
+*dedicated* one — chromeless, full-screen, on its own profile, worth pinning to a
+monitor:
 
 ```sh
 bin/claudeview-open
 ```
+
+That script needs a Chromium-family browser (`google-chrome`, `chromium`,
+`brave-browser`, Edge), because it leans on `--app` for the chromeless window and
+`--window-position` to land it on the right monitor — neither of which Firefox
+offers. See [Placing the window](docs/GUIDE.md#placing-the-window).
 
 The viewer's header shows which directory it is watching and whether the live
 connection is up. Prove it works without Claude:
