@@ -7,11 +7,12 @@ tabs, already rendered to HTML by the server, plus the directories being watched
 and shows the tab the server marks as focused — the most recently modified one.
 Clicking a tab pins it until the next content change.
 
-Tabs are named `<session>~<doc>` (session is `<repo>~<branch>`), so the viewer
-folds them into one split-button per session: the button jumps to that session's
-newest document, and a dropdown reaches the older ones. The part before the last
-`~` is the group key, matched case-insensitively; a name with no `~` falls back to
-the older rule (the segment before the first `-`) so pre-`~` tabs still group.
+Tabs are named `<repo>~<branch>~<doc>`, so the viewer folds them into one
+split-button per **repo**: the button jumps to that repo's newest document, and a
+dropdown reaches the rest. The first `~`-segment is the group key, matched
+case-insensitively; the branch moves into the dropdown labels (shown only when a
+repo spans more than one). A name with no `~` falls back to the older rule (the
+segment before the first `-`) so pre-`~` tabs still group.
 
 A slim header shows what the server is watching, the document on screen, and
 whether the live connection is up, so an empty screen still tells you where to look.
@@ -165,32 +166,61 @@ tabDecoder =
 
 
 type alias Group =
-    { key : String -- lowercased session — identity and active-matching
-    , label : String -- display form ("repo@branch"), original case
+    { key : String -- lowercased repo — identity and active-matching
+    , label : String -- display form (the repo), original case
     , tabs : List Tab -- newest-first
     }
 
 
-{-| The session a tab belongs to. New-grammar names (`repo~branch~doc`) split on
-the _last_ `~`. Names with no `~` fall back to the old rule — the segment before
-the first `-` — so tabs written before the `~` grammar still group by project.
+{-| Split a tab name into its segments on the grammar's delimiter: `~` for current
+names (`repo~branch~doc`), the legacy `-` for names written before it. Every
+name-part function shares this, so the two grammars stay in lockstep.
+-}
+splitName : String -> List String
+splitName name =
+    String.split
+        (if String.contains "~" name then
+            "~"
+
+         else
+            "-"
+        )
+        name
+
+
+last : List a -> Maybe a
+last =
+    List.reverse >> List.head
+
+
+{-| The group a tab belongs to: the first segment — the repo. Every branch of a
+repo folds into one group; the branch moves into the document label instead.
 -}
 sessionPart : String -> String
 sessionPart name =
-    if String.contains "~" name then
-        case List.reverse (String.split "~" name) of
-            _ :: session ->
-                if List.isEmpty session then
-                    name
+    splitName name |> List.head |> Maybe.withDefault name
 
-                else
-                    session |> List.reverse |> String.join "~"
 
-            [] ->
-                name
+{-| The document type: the last segment (`plan`, `summary`, `nuc-setup`). A legacy
+multi-hyphen name keeps only its final word — those are retired by the `~` grammar.
+-}
+docPart : String -> String
+docPart name =
+    splitName name |> last |> Maybe.withDefault name
 
-    else
-        name |> String.split "-" |> List.head |> Maybe.withDefault name
+
+{-| The branch a tab belongs to, or `""` when there is none to show. A branch
+exists only in the current grammar — exactly three `~`-segments, `repo~branch~doc` —
+so this splits on `~` directly rather than pretend a legacy hyphen-name has one.
+-}
+branchPart : String -> String
+branchPart name =
+    case String.split "~" name of
+        [ _, branch, _ ] ->
+            branch
+
+        _ ->
+            ""
 
 
 {-| The grouping identity: the session part, lowercased so one project written in
@@ -201,26 +231,12 @@ groupKey name =
     String.toLower (sessionPart name)
 
 
-{-| The human label for a group: `repo@branch` for a `repo~branch` session, else
-the session verbatim (a legacy name or a bare singleton like `plan`). `@` is
-display-only — on disk the delimiter is `~`.
+{-| The human label for a group: just the repo. Branches live in the document
+labels now, so a group reads as the bare project name.
 -}
 groupLabel : String -> String
 groupLabel name =
-    if String.contains "~" name then
-        case String.split "~" (sessionPart name) of
-            repo :: branch ->
-                if List.isEmpty branch then
-                    repo
-
-                else
-                    repo ++ "@" ++ String.join "~" branch
-
-            [] ->
-                name
-
-    else
-        sessionPart name
+    sessionPart name
 
 
 {-| Fold the flat tab list into alphabetical groups (a `Dict` orders its keys),
@@ -246,38 +262,6 @@ toGroups tabs =
                 in
                 { key = key, label = label, tabs = sorted }
             )
-
-
-{-| The label for a dropdown entry: the document type after the session prefix
-(`plan`, `summary`, `review`). New grammar takes the segment after the last `~`;
-a legacy name takes the part after the first `-`; either falls back to the whole
-name when there is no suffix.
--}
-docLabel : String -> String
-docLabel name =
-    if String.contains "~" name then
-        case List.reverse (String.split "~" name) of
-            doc :: rest ->
-                if List.isEmpty rest then
-                    name
-
-                else
-                    doc
-
-            [] ->
-                name
-
-    else
-        case String.split "-" name of
-            _ :: rest ->
-                if List.isEmpty rest then
-                    name
-
-                else
-                    String.join "-" rest
-
-            [] ->
-                name
 
 
 relative : Int -> Int -> String
@@ -367,6 +351,15 @@ groupView model g =
         multi =
             List.length g.tabs > 1
 
+        showBranch =
+            (g.tabs
+                |> List.map (.name >> branchPart)
+                |> List.filter (\b -> b /= "")
+                |> unique
+                |> List.length
+            )
+                > 1
+
         live =
             g.key == "plan"
 
@@ -389,19 +382,45 @@ groupView model g =
           else
             text ""
         , if multi && model.openGroup == Just g.key then
-            div [ class "tab-menu" ] (List.map (menuItem model.now) g.tabs)
+            div [ class "tab-menu" ] (List.map (menuItem model.now showBranch) g.tabs)
 
           else
             text ""
         ]
 
 
-menuItem : Int -> Tab -> Html Msg
-menuItem now t =
+{-| A dropdown entry: the document type, prefixed with its branch only when the
+group actually spans more than one branch (so single-branch repos stay uncluttered).
+-}
+menuItem : Int -> Bool -> Tab -> Html Msg
+menuItem now showBranch t =
+    let
+        entry =
+            if showBranch && branchPart t.name /= "" then
+                branchPart t.name ++ " / " ++ docPart t.name
+
+            else
+                docPart t.name
+    in
     button [ class "tab-menu-item", onClick (Focus t.name) ]
-        [ span [ class "doc" ] [ text (docLabel t.name) ]
+        [ span [ class "doc" ] [ text entry ]
         , span [ class "ago" ] [ text (relative now t.mtime) ]
         ]
+
+
+{-| The distinct elements of a list, order preserved.
+-}
+unique : List a -> List a
+unique =
+    List.foldr
+        (\x acc ->
+            if List.member x acc then
+                acc
+
+            else
+                x :: acc
+        )
+        []
 
 
 {-| An invisible full-window layer under any open menu: a click anywhere off the
