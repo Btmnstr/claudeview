@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Orientation for an AI assistant working in this repo. Keep it small; read the
-source — it is short (~760 lines total) and heavily commented.
+source — it is short and heavily commented.
 
 ## What it is
 
@@ -55,8 +55,8 @@ with unique tab names rather than `start_supervised` (which collides on the name
 
 ## Config (server env vars — see README "Configuration")
 
-`PORT` `WATCH_DIR` `POLL_MS` `JOIN_WINDOW_S` (120) `JOIN_PATTERN` (`-[0-9a-f]{4,}$`)
-`CLAUDEVIEW_LABEL` `WEB_DIR`. `config/config.exs` is intentionally empty.
+`PORT` `WATCH_DIR` `POLL_MS` `JOIN_WINDOW_S` (120) `JOIN_PATTERN` (`~summary$`)
+`CLAUDEVIEW_LABEL` `WEB_DIR` `CLAUDEVIEW_SEED`. `config/config.exs` is intentionally empty.
 
 ## Conventions
 
