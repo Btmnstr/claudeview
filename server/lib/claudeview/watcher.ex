@@ -47,7 +47,7 @@ defmodule Claudeview.Watcher do
   # directory again). `CLAUDEVIEW_SEED` points at the image-baked copy; unset
   # (local dev, whose default `content/` already holds it) means no seed.
   defp maybe_seed(dir) do
-    seed = System.get_env("CLAUDEVIEW_SEED")
+    seed = Claudeview.Config.seed()
 
     if seed && File.exists?(seed) && Path.wildcard(Path.join(dir, "*.md")) == [] do
       case File.cp(seed, Path.join(dir, Path.basename(seed))) do

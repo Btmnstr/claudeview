@@ -18,8 +18,7 @@ defmodule Claudeview.Router do
   # Served from the watch dir; safe_name/1 collapses to a basename, so a request
   # can never escape it (flat layout — images live directly in the watch dir).
   get "/media/:name" do
-    dir = System.get_env("WATCH_DIR", "content")
-    send_static(conn, Path.join(dir, safe_name(name)))
+    send_static(conn, Path.join(Claudeview.Config.watch_dir(), safe_name(name)))
   end
 
   get "/content" do
@@ -67,7 +66,7 @@ defmodule Claudeview.Router do
   # Static assets
 
   defp serve(conn, name) do
-    send_static(conn, Path.join(web_dir(), Path.basename(name)))
+    send_static(conn, Path.join(Claudeview.Config.web_dir(), Path.basename(name)))
   end
 
   # Serve a file under its content type, or 404 when it is absent. The two static
@@ -85,13 +84,11 @@ defmodule Claudeview.Router do
 
   defp not_found(conn), do: send_resp(conn, 404, "not found\n")
 
-  defp web_dir, do: System.get_env("WEB_DIR", "priv/web")
-
   # Where an HTTP push lands: the first watched directory. WATCH_DIR may list
   # several specs (e.g. "/content:/plans=plan"), but a push only ever writes the
   # primary one — the same directory the file-delivery hook writes to.
   defp push_dir do
-    System.get_env("WATCH_DIR", "content")
+    Claudeview.Config.watch_dir()
     |> Claudeview.Watcher.parse_specs()
     |> List.first()
     |> elem(0)
@@ -102,12 +99,12 @@ defmodule Claudeview.Router do
   # knows /content, so `CLAUDEVIEW_LABEL` supplies a meaningful path); a collapsed
   # `DIR=TAB` spec shows "<tab> tab" instead of its opaque container path.
   defp watching_paths do
-    System.get_env("WATCH_DIR", "content")
+    Claudeview.Config.watch_dir()
     |> Claudeview.Watcher.parse_specs()
     |> Enum.map(&label_spec/1)
   end
 
-  defp label_spec({dir, nil}), do: System.get_env("CLAUDEVIEW_LABEL") || dir
+  defp label_spec({dir, nil}), do: Claudeview.Config.label() || dir
   defp label_spec({_dir, tab}), do: "#{tab} tab"
 
   @content_types %{

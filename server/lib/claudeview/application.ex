@@ -6,13 +6,17 @@ defmodule Claudeview.Application do
 
   @impl true
   def start(_type, _args) do
-    port = env_int("PORT", 4790)
-    watch_dir = System.get_env("WATCH_DIR", "content")
-    poll_ms = env_int("POLL_MS", 1000)
-    join_window_s = env_int("JOIN_WINDOW_S", 120)
+    alias Claudeview.Config
+
+    port = Config.port()
+    watch_dir = Config.watch_dir()
+    poll_ms = Config.poll_ms()
 
     children =
-      [{Claudeview.Store, join_window_s: join_window_s, join_pattern: join_pattern()}] ++
+      [
+        {Claudeview.Store,
+         join_window_s: Config.join_window_s(), join_pattern: Config.join_pattern()}
+      ] ++
         watchers(watch_dir, poll_ms) ++
         [{Bandit, plug: Claudeview.Router, port: port}]
 
@@ -33,22 +37,5 @@ defmodule Claudeview.Application do
         id: {Claudeview.Watcher, i}
       )
     end)
-  end
-
-  defp env_int(name, default) do
-    case System.get_env(name) do
-      nil -> default
-      value -> String.to_integer(value)
-    end
-  end
-
-  # Tab names matching this pattern have rapid rewrites joined rather than
-  # replaced. Default: the auto-generated `~summary` tab, whose Stop-hook settle
-  # race can write twice moments apart. Plan and manual docs replace on rewrite.
-  defp join_pattern do
-    case System.get_env("JOIN_PATTERN") do
-      nil -> ~r/~summary$/
-      source -> Regex.compile!(source)
-    end
   end
 end

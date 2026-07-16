@@ -39,8 +39,8 @@ defmodule Claudeview.Store do
     state = %{
       tabs: %{},
       subs: MapSet.new(),
-      join_window_s: Keyword.get(opts, :join_window_s, 120),
-      join_pattern: Keyword.get(opts, :join_pattern, ~r/~summary$/)
+      join_window_s: Keyword.get_lazy(opts, :join_window_s, &Claudeview.Config.join_window_s/0),
+      join_pattern: Keyword.get_lazy(opts, :join_pattern, &Claudeview.Config.join_pattern/0)
     }
 
     {:ok, state}
@@ -49,9 +49,8 @@ defmodule Claudeview.Store do
   @impl true
   def handle_cast({:put, tab, html, mtime}, state) do
     broadcast(state.subs)
-    existing = state.tabs[tab]
-    html = if join?(existing, mtime, tab, state), do: existing.html <> @join <> html, else: html
-    {:noreply, put_in(state.tabs[tab], %{html: html, mtime: mtime})}
+    entry = %{html: merged_html(state, tab, html, mtime), mtime: mtime}
+    {:noreply, put_in(state.tabs[tab], entry)}
   end
 
   def handle_cast({:drop, tab}, state) do
@@ -72,15 +71,27 @@ defmodule Claudeview.Store do
     {:noreply, update_in(state.subs, &MapSet.delete(&1, pid))}
   end
 
+  # The HTML to store for `tab`: a fresh write to a joinable tab within the window
+  # is appended below the previous one (see the moduledoc); anything else replaces.
+  defp merged_html(state, tab, html, mtime) do
+    existing = state.tabs[tab]
+
+    if join?(existing, mtime, tab, state.join_window_s, state.join_pattern) do
+      existing.html <> @join <> html
+    else
+      html
+    end
+  end
+
   # Join only a fresh write (strictly newer mtime) to a joinable tab that was
   # last written within the window. The strict `>` keeps a Watcher restart —
   # which re-observes every file at its unchanged mtime — from duplicating content.
-  defp join?(nil, _mtime, _tab, _state), do: false
+  defp join?(nil, _mtime, _tab, _window_s, _pattern), do: false
 
-  defp join?(existing, mtime, tab, state) do
+  defp join?(existing, mtime, tab, window_s, pattern) do
     mtime > existing.mtime and
-      mtime - existing.mtime <= state.join_window_s and
-      Regex.match?(state.join_pattern, tab)
+      mtime - existing.mtime <= window_s and
+      Regex.match?(pattern, tab)
   end
 
   defp broadcast(subs), do: Enum.each(subs, &send(&1, :changed))
