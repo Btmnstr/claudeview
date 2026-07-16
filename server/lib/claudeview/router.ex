@@ -1,5 +1,15 @@
 defmodule Claudeview.Router do
-  @moduledoc "HTTP surface: the viewer, its assets, the SSE stream and the push endpoint."
+  @moduledoc """
+  The HTTP surface, a `Plug.Router`: the viewer and its static assets, the JSON
+  content snapshot, the SSE stream and the push endpoint.
+
+  Most routes (`/`, `/assets`, `/media`, `/content`, `/push`) build one response
+  and return. `/events` is the exception: it opens a chunked response and then
+  *stays* in a receive loop (`sse_loop/1` ↔ `send_chunk/2`), forwarding a chunk
+  whenever the Store signals `:changed` — and a keep-alive comment otherwise — for
+  the life of the connection. `/content` reports the newest-modified tab as the
+  focus; the viewer honours or overrides it per its pin state.
+  """
 
   use Plug.Router
 
@@ -120,6 +130,7 @@ defmodule Claudeview.Router do
     ".svg" => "image/svg+xml"
   }
 
+  @spec content_type(Path.t()) :: String.t()
   defp content_type(path) do
     ext = path |> Path.extname() |> String.downcase()
     Map.get(@content_types, ext, "application/octet-stream")
@@ -127,12 +138,14 @@ defmodule Claudeview.Router do
 
   # `~` is kept: it is the reserved session/doc delimiter in tab names, and the
   # local and HTTP push paths must agree on it or a remote push would be mangled.
+  @spec safe_name(String.t()) :: String.t()
   defp safe_name(name) do
     name |> Path.basename() |> String.replace(~r/[^A-Za-z0-9_.~-]/, "_")
   end
 
   # Server-Sent Events: block until the store signals a change, then ping the
   # client. A comment line every 20s keeps proxies from closing an idle stream.
+  @spec sse_loop(Plug.Conn.t()) :: Plug.Conn.t()
   defp sse_loop(conn) do
     receive do
       :changed -> send_chunk(conn, "data: changed\n\n")
@@ -141,6 +154,10 @@ defmodule Claudeview.Router do
     end
   end
 
+  # Write one chunk, then re-enter `sse_loop/1` to await the next: the two
+  # mutually recurse to stream for the connection's life. A write error means the
+  # client hung up, which ends the recursion and lets the request finish.
+  @spec send_chunk(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
   defp send_chunk(conn, data) do
     case chunk(conn, data) do
       {:ok, conn} -> sse_loop(conn)

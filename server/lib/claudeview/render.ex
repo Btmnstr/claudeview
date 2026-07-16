@@ -49,6 +49,13 @@ defmodule Claudeview.Render do
   # points at a file the author dropped beside the .md; route it through /media.
   @img_src ~r/(<img[^>]+\bsrc=")(?!https?:|data:|\/)([^"]+)(")/i
 
+  @doc """
+  Render the Markdown file at `path` to an HTML string: GFM to HTML via
+  `cmark-gfm`, then each fenced block transformed (diagram → SVG, known language →
+  highlighted, else verbatim) and relative image links routed through `/media`.
+  A missing `cmark-gfm` or a non-zero exit yields an HTML error notice, never a raise.
+  """
+  @spec to_html(Path.t()) :: String.t()
   def to_html(path) do
     args = Enum.flat_map(@extensions, &["-e", &1]) ++ [path]
 

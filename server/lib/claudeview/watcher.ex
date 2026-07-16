@@ -14,12 +14,14 @@ defmodule Claudeview.Watcher do
   use GenServer
   require Logger
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
   @doc """
   Parse a colon-separated `WATCH_DIR` into `{dir, tab | nil}` specs. Each entry is
   `DIR` (one tab per file) or `DIR=TAB` (the directory collapsed to a single tab).
   """
+  @spec parse_specs(String.t()) :: [{String.t(), String.t() | nil}]
   def parse_specs(watch_dir) do
     watch_dir
     |> String.split(":", trim: true)

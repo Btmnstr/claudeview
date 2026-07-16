@@ -15,21 +15,32 @@ defmodule Claudeview.Store do
 
   use GenServer
 
+  @typedoc "A rendered tab: its HTML and the mtime of the file it came from."
+  @type tab :: %{html: String.t(), mtime: integer()}
+
   # Separator between two joined writes. Two cmark-gfm fragments stacked with an
   # <hr> between form valid HTML; each was already highlighted, so no re-render.
   @join "\n<hr class=\"cv-join\">\n"
 
   # Public API
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
+  @doc "Store `html` (rendered from a file of the given `mtime`) under tab `tab`."
+  @spec put(String.t(), String.t(), integer()) :: :ok
   def put(tab, html, mtime), do: GenServer.cast(__MODULE__, {:put, tab, html, mtime})
 
+  @doc "Forget a tab whose file has vanished."
+  @spec drop(String.t()) :: :ok
   def drop(tab), do: GenServer.cast(__MODULE__, {:drop, tab})
 
+  @doc "Every tab's rendered content, keyed by name."
+  @spec snapshot() :: %{optional(String.t()) => tab()}
   def snapshot, do: GenServer.call(__MODULE__, :snapshot)
 
   @doc "Subscribe the calling process; it receives a bare `:changed` on every change."
+  @spec subscribe() :: :ok
   def subscribe, do: GenServer.cast(__MODULE__, {:subscribe, self()})
 
   # Server
@@ -73,6 +84,7 @@ defmodule Claudeview.Store do
 
   # The HTML to store for `tab`: a fresh write to a joinable tab within the window
   # is appended below the previous one (see the moduledoc); anything else replaces.
+  @spec merged_html(map(), String.t(), String.t(), integer()) :: String.t()
   defp merged_html(state, tab, html, mtime) do
     existing = state.tabs[tab]
 
@@ -86,6 +98,7 @@ defmodule Claudeview.Store do
   # Join only a fresh write (strictly newer mtime) to a joinable tab that was
   # last written within the window. The strict `>` keeps a Watcher restart —
   # which re-observes every file at its unchanged mtime — from duplicating content.
+  @spec join?(tab() | nil, integer(), String.t(), integer(), Regex.t()) :: boolean()
   defp join?(nil, _mtime, _tab, _window_s, _pattern), do: false
 
   defp join?(existing, mtime, tab, window_s, pattern) do
