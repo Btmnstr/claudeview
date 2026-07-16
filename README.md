@@ -313,6 +313,7 @@ The prototype runs locally, but nothing is local-only:
 | `JOIN_WINDOW_S` | `120` | A joinable tab rewritten within this many seconds of its previous write is *joined* (new content appended below a rule) rather than replaced, so two quick writes don't clobber each other. |
 | `JOIN_PATTERN` | `~summary$` | Which tab names join: by default the auto-generated `~summary` tab, whose Stop-hook settle race can write twice. Plan, review and manual docs don't match, so they replace. |
 | `WEB_DIR` | `priv/web` | Where `index.html` / `elm.js` / `theme.css` / webfonts are served from. |
+| `CLAUDEVIEW_SEED` | *(unset locally; `/app/priv/welcome.md` in the image)* | A Markdown file copied into a per-file watch dir when it holds no `*.md` yet, so a fresh server greets you with the setup guide. Never overwrites existing content; reappears only if you empty the directory again. |
 
 Hook environment variables (set on the machine running Claude Code):
 
@@ -355,7 +356,7 @@ Launcher environment variables (`bin/claudeview-open`, set on the viewer machine
 | `hooks/settings.snippet.json` | Hook wiring to merge into `~/.claude/settings.json`. |
 | `bin/claudeview-open` | Opens the viewer as a dedicated, full-screen browser window. |
 | `bin/claudeview-session` | Prints this directory's session key, so a manual `Write` groups with the hook's tabs. |
-| `content/welcome.md` | Seed tab; copy it into `~/.claudeview` on first run. The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
+| `content/welcome.md` | The setup guide, baked into the image and auto-seeded into an empty watch dir on first run (`CLAUDEVIEW_SEED`). The live `WATCH_DIR` is `~/.claudeview`, not this folder. |
 | `Dockerfile` / `docker-compose.yml` | Contained build (Elm + Elixir + cmark-gfm + chroma + graphviz + mmdr), plus the `tools` stage that runs the checks below. |
 | `Makefile` / `githooks/` | The code-quality tool chain and its opt-in git hooks (see Development). |
 
@@ -407,14 +408,12 @@ undone by `git config --unset core.hooksPath`). `pre-commit` runs the fast half
   `cmark-gfm` output and `chroma`'s highlighted spans are injected as-is. For
   untrusted input, enable `cmark-gfm`'s `tagfilter` extension in
   `server/lib/claudeview/render.ex`.
-
-## Future improvements
-
-- **Keep a manually opened document pinned across content changes.** Selecting
-  an older document (a `plan`, say) gives way to the project's newest-modified
-  tab on the next watched-file change, because every SSE ping re-adopts the
-  server's focus. A sticky "the user picked this" flag that survives refetches
-  would let you keep reading an older tab without it being pulled away.
+- **Pinning holds your place across writes.** By default each content change
+  re-adopts the server's focus (the newest-modified doc), so a busy session can
+  pull the view away mid-read. Click the **📌** at the body's top-left to pin the
+  current document, or just scroll off the top — that pins automatically and
+  releases when you scroll back. While pinned, a group that gains a new document
+  shows a small **red dot**; click the group to open it, which clears the dot.
 
 ## Deliberately out of scope
 
