@@ -309,7 +309,8 @@ html, body {
 }
 
 /* The pin toggle, anchored to the body's top-left, clear of the centred prose.
-   Faint and grey when unpinned; full-colour with an accent ring when pinned. */
+   Faint and grey when unpinned; full-colour when pinned — no border, the
+   fade and desaturation carry the contrast on their own. */
 .content-pane .pin {
   position: absolute;
   top: 10px;
@@ -319,7 +320,7 @@ html, body {
   line-height: 1;
   padding: 4px 6px;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
   cursor: pointer;
   opacity: 0.35;
@@ -333,7 +334,6 @@ html, body {
 .content-pane .pin.pinned {
   opacity: 1;
   filter: none;
-  border-color: var(--accent);
 }
 
 .content {
