@@ -308,7 +308,8 @@ html, body {
   left: 0;
   z-index: 20;
   margin-top: 4px;
-  min-width: 180px;
+  min-width: 240px;
+  max-width: 420px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -334,6 +335,12 @@ html, body {
 
 .tab-menu-item:hover {
   background: var(--bg);
+}
+
+.tab-menu-item .doc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-menu-item .ago {
