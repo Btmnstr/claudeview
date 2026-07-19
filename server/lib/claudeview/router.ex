@@ -128,12 +128,15 @@ defmodule Claudeview.Router do
 
   defp not_found(conn), do: send_resp(conn, 404, "not found\n")
 
+  # The parsed `WATCH_DIR` specs — `{dir, tab | nil}` per entry. Several routes
+  # resolve names against them, so the read-and-parse lives here once.
+  defp specs, do: Claudeview.Watcher.parse_specs(Claudeview.Config.watch_dir())
+
   # Where an HTTP push lands: the first watched directory. WATCH_DIR may list
   # several specs (e.g. "/content:/plans=plan"), but a push only ever writes the
   # primary one — the same directory the file-delivery hook writes to.
   defp push_dir do
-    Claudeview.Config.watch_dir()
-    |> Claudeview.Watcher.parse_specs()
+    specs()
     |> List.first()
     |> elem(0)
   end
@@ -144,8 +147,7 @@ defmodule Claudeview.Router do
   # its newest file under the fixed tab name, so we hand back that same newest file.
   @spec resolve_download(String.t()) :: Path.t() | nil
   defp resolve_download(name) do
-    Claudeview.Config.watch_dir()
-    |> Claudeview.Watcher.parse_specs()
+    specs()
     |> Enum.find_value(fn
       {dir, nil} ->
         path = Path.join(dir, safe_name(name) <> ".md")
@@ -184,7 +186,7 @@ defmodule Claudeview.Router do
   # `Store.drop/1` makes them disappear from the viewer at once. `Claudeview.Gc`
   # does the disk work; name sanitization stays here where `safe_name/1` lives.
   defp clear_old(names, keep) do
-    specs = Claudeview.Watcher.parse_specs(Claudeview.Config.watch_dir())
+    specs = specs()
     per_file = for {dir, nil} <- specs, do: dir
     collapsed = for {dir, tab} <- specs, tab != nil, do: dir
 
@@ -198,8 +200,7 @@ defmodule Claudeview.Router do
   # knows /content, so `CLAUDEVIEW_LABEL` supplies a meaningful path); a collapsed
   # `DIR=TAB` spec shows "<tab> tab" instead of its opaque container path.
   defp watching_paths do
-    Claudeview.Config.watch_dir()
-    |> Claudeview.Watcher.parse_specs()
+    specs()
     |> Enum.map(&label_spec/1)
   end
 
