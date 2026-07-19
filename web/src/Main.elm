@@ -267,21 +267,26 @@ adoptFocus model content =
     }
 
 
+{-| The tabs in `new` that changed since `prev` — genuinely new, or the same name
+at a bumped mtime. The single basis for both "did anything change?" and "which
+groups changed?", so the notion of freshness lives in exactly one place.
+-}
+freshTabs : List Tab -> List Tab -> List Tab
+freshTabs prev new =
+    let
+        mtimes =
+            Dict.fromList (List.map (\t -> ( t.name, t.mtime )) prev)
+    in
+    List.filter (\t -> Dict.get t.name mtimes /= Just t.mtime) new
+
+
 {-| Fold the groups that gained content since our last snapshot into the alert
-set: a tab is fresh when it is new or its mtime bumped, and it is not the doc on
-screen. Only ever called while pinned, so the first load never raises a dot.
+set: a fresh tab that is not the doc on screen. Only ever called while pinned, so
+the first load never raises a dot.
 -}
 markAlerts : Model -> Content -> Set String
 markAlerts model content =
-    let
-        prev =
-            Dict.fromList (List.map (\t -> ( t.name, t.mtime )) model.tabs)
-
-        isFresh t =
-            Dict.get t.name prev /= Just t.mtime
-    in
-    content.tabs
-        |> List.filter isFresh
+    freshTabs model.tabs content.tabs
         |> List.filter (\t -> Just t.name /= model.focus)
         |> List.map (.name >> groupKey)
         |> List.foldl Set.insert model.alerts
@@ -294,11 +299,7 @@ window may have been in the background.
 -}
 hasFreshContent : Model -> Content -> Bool
 hasFreshContent model content =
-    let
-        prev =
-            Dict.fromList (List.map (\t -> ( t.name, t.mtime )) model.tabs)
-    in
-    List.any (\t -> Dict.get t.name prev /= Just t.mtime) content.tabs
+    not (List.isEmpty (freshTabs model.tabs content.tabs))
 
 
 {-| Drop the dot for the group a focused document belongs to — it has been seen.
