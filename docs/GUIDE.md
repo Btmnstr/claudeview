@@ -172,6 +172,53 @@ pins automatically and releases when you scroll back. While pinned, a group that
 gains a new document shows a small **red dot**; click the group to open it, which
 clears the dot.
 
+### Starring a document as a reference
+
+The **⭐** just below the pin marks the current document as a *reference*. A
+starred document carries a ★ in its group's dropdown, so a plan, design doc or
+research note you keep coming back to stays easy to pick out among the churnier
+`summary` output around it. The mark is purely manual — unlike the pin it never
+moves on its own — and it lives for the life of the viewer page (a reload starts
+fresh). Its second job is protection: **"Clear old" never deletes a starred
+document** (see below).
+
+### Downloading a document
+
+The **⬇** at the top-right hands you the document's *raw Markdown* — the original
+source the server rendered, not the HTML on screen — as a `.md` file download. The
+watched directory is best treated as a scratch of temporary copies (see the next
+section), so this is how you lift a plan or review out of it and keep it somewhere
+permanent.
+
+### Clearing old documents
+
+The tabs in the viewer are **temporary copies**: the hook and your `Write`s drop
+Markdown into the watched directory and it accumulates. **"Clear old"** in the
+header is the housekeeping for that — but be clear on what it does:
+
+> It **permanently deletes** the underlying `.md` files from the watched
+> directory. This is a real removal, not just hiding tabs — the tab and its file
+> both go, and there is no undo.
+
+That is safe *because* those files are throwaway: the durable version of the work
+lives in your repo, the plan file, or the Claude Code transcript. But if a document
+in there is the only copy of something you want, **download it first**.
+
+What it keeps:
+
+- Each repo group is pruned to its **newest ten** documents; older ones are
+  deleted.
+- **Starred documents are always kept**, and count toward the ten — so a starred
+  reference survives a cull of newer, disposable output.
+- The collapsed plan directory is swept to the same depth, clearing the old plan
+  files that pile up invisibly behind the single `plan (live)` tab.
+
+Since a starred document's protection is only as good as the viewer's *current*
+star state (stars reset on reload), re-star what matters before a big clear. The
+button takes **two clicks** — it arms into a red **Delete N** beside a yellow
+**Cancel**, so a one-way delete never fires on a stray click — and it hides
+entirely when there is nothing old enough to remove.
+
 ### Tabs and session grouping
 
 The hook names each tab **`<repo>~<branch>~<doc>`**: the git repo (a bare-repo +
@@ -283,7 +330,7 @@ Set on the viewer machine, for `bin/claudeview-open`:
 | `GET` | `/media/<name>` | An image file from `WATCH_DIR`, for Markdown `![alt](name.png)`. |
 | `GET` | `/download/<name>` | The tab's raw Markdown, as a file download (`Content-Disposition: attachment`). |
 | `POST` | `/push?tab=<name>` | Write the request body to `<name>.md` in `WATCH_DIR`. |
-| `POST` | `/clear-old` | Prune stale documents. Body `{"delete": [names], "keep": n}`: the viewer sends the exact stale list plus its keep-depth, and the server also sweeps each collapsed directory to its newest `keep` files. |
+| `POST` | `/clear-old` | Prune (delete) stale documents — see [Clearing old documents](#clearing-old-documents). Body `{"delete": [names], "keep": n}`: the viewer sends the exact stale list plus its keep-depth, and the server also sweeps each collapsed directory to its newest `keep` files. |
 
 ## Development
 

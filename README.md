@@ -161,8 +161,9 @@ explains why, and what to match if you point the viewer elsewhere.
 ## Documentation
 
 - **[docs/GUIDE.md](docs/GUIDE.md)** — platform setup (WSL2, autostart), usage
-  tips (portrait rotation, pinning), diagrams and images, running it on a home
-  lab, the full configuration and endpoint reference, and the development gate.
+  tips (portrait rotation, pinning, starring, downloading, clearing old docs),
+  diagrams and images, running it on a home lab, the full configuration and
+  endpoint reference, and the development gate.
 - **[AGENTS.md](AGENTS.md)** — architecture and conventions. Written for an AI
   assistant working in this repo, and the shortest tour of the internals.
 
