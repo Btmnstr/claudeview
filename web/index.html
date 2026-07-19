@@ -94,6 +94,16 @@
     events.onerror = function () {
       app.ports.sseStatus.send(false);
     };
+
+    // A backgrounded tab can be frozen or throttled, and an SSE "changed" that
+    // arrives then may be dropped — the keep-alive holds the connection open, so
+    // no reconnect re-syncs it and the view goes stale. Treat re-activation as a
+    // sync point: refetch by replaying the same "changed" nudge Elm acts on.
+    var resync = function () { app.ports.sseMessage.send("changed"); };
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") resync();
+    });
+    window.addEventListener("focus", resync);
   </script>
 </body>
 </html>
