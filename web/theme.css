@@ -440,6 +440,16 @@ html, body {
   height: auto;
 }
 
+/* Print only the reading surface: the top bar, the tab groups and the pin
+   toggle are navigation, not content. */
+@media print {
+  .header,
+  .tabs,
+  .content-pane .pin {
+    display: none;
+  }
+}
+
 /* A rendered diagram (```mermaid / ```dot / ```svg → inline SVG). Kept on a light
    card in both themes so black-on-transparent output from Graphviz/Mermaid always
    reads; per-renderer dark theming can come later. Wide diagrams scroll. */
