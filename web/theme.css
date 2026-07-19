@@ -336,6 +336,39 @@ html, body {
   filter: none;
 }
 
+/* The star toggle, sitting just below the pin and sharing its faint-until-active
+   treatment. A purely manual mark: full-colour once a document is starred. */
+.content-pane .star {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  z-index: 5;
+  font-size: 0.9em;
+  line-height: 1;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.content-pane .star:hover {
+  opacity: 0.7;
+}
+
+.content-pane .star.starred {
+  opacity: 1;
+  filter: none;
+}
+
+/* A starred document's mark in the dropdown, ahead of its label. */
+.tab-menu-item .doc .star-mark {
+  margin-right: 6px;
+  color: #e2b53e;
+}
+
 .content {
   flex: 1;
   overflow-y: auto;
@@ -440,12 +473,13 @@ html, body {
   height: auto;
 }
 
-/* Print only the reading surface: the top bar, the tab groups and the pin
-   toggle are navigation, not content. */
+/* Print only the reading surface: the top bar, the tab groups and the pin and
+   star toggles are navigation, not content. */
 @media print {
   .header,
   .tabs,
-  .content-pane .pin {
+  .content-pane .pin,
+  .content-pane .star {
     display: none;
   }
 }

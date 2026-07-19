@@ -87,6 +87,7 @@ type alias Model =
     , pin : Pin -- how the pane holds still: follow scroll, or a manual hold
     , atTop : Bool -- the reading pane is scrolled to the top
     , alerts : Set String -- group keys that gained new content while pinned
+    , starred : Set String -- tab names manually marked as reference documents
     , loaded : Bool -- a first snapshot is in hand; gates the initial load from marking the tab
     }
 
@@ -95,7 +96,7 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty, loaded = False }
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty, starred = Set.empty, loaded = False }
     , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
     )
 
@@ -135,6 +136,7 @@ type Msg
     | Tick Time.Posix
     | ToggleTheme
     | TogglePin
+    | ToggleStar String
     | Scrolled Bool
 
 
@@ -208,6 +210,11 @@ update msg model =
               }
             , Cmd.none
             )
+
+        ToggleStar name ->
+            -- A manual, sticky mark on a single document; unlike the pin it never
+            -- moves on its own. Toggles membership in the starred set.
+            ( { model | starred = toggleMember name model.starred }, Cmd.none )
 
         Scrolled top ->
             ( { model | atTop = top }, Cmd.none )
@@ -287,6 +294,17 @@ toggleOpen key open =
 
     else
         Just key
+
+
+{-| Flip a value's membership in a set — in if it was out, out if it was in.
+-}
+toggleMember : comparable -> Set comparable -> Set comparable
+toggleMember x set =
+    if Set.member x set then
+        Set.remove x set
+
+    else
+        Set.insert x set
 
 
 fetchContent : Cmd Msg
@@ -550,7 +568,7 @@ groupView model group =
             ]
         , viewIf multi (caretButton group.key)
         , viewIf (multi && model.openGroup == Just group.key)
-            (groupMenu model.now (groupSpansMultipleBranches group) group.tabs)
+            (groupMenu model.now model.starred (groupSpansMultipleBranches group) group.tabs)
         ]
 
 
@@ -563,16 +581,17 @@ caretButton key =
 
 {-| The dropdown listing a group's documents newest-first.
 -}
-groupMenu : Int -> Bool -> List Tab -> Html Msg
-groupMenu now showBranch tabs =
-    div [ class "tab-menu" ] (List.map (menuItem now showBranch) tabs)
+groupMenu : Int -> Set String -> Bool -> List Tab -> Html Msg
+groupMenu now starred showBranch tabs =
+    div [ class "tab-menu" ] (List.map (menuItem now starred showBranch) tabs)
 
 
 {-| A dropdown entry: the document type, prefixed with its branch only when the
 group actually spans more than one branch (so single-branch repos stay uncluttered).
+A leading star marks a document the reader flagged as a reference.
 -}
-menuItem : Int -> Bool -> Tab -> Html Msg
-menuItem now showBranch tab =
+menuItem : Int -> Set String -> Bool -> Tab -> Html Msg
+menuItem now starred showBranch tab =
     let
         entry =
             if showBranch && branchPart tab.name /= "" then
@@ -582,7 +601,10 @@ menuItem now showBranch tab =
                 docPart tab.name
     in
     button [ class "tab-menu-item", onClick (Focus tab.name) ]
-        [ span [ class "doc" ] [ text entry ]
+        [ span [ class "doc" ]
+            [ viewIf (Set.member tab.name starred) (span [ class "star-mark" ] [ text "★" ])
+            , text entry
+            ]
         , span [ class "ago" ] [ text (relative now tab.mtime) ]
         ]
 
@@ -633,6 +655,7 @@ contentPane model =
             -- `docName` names the document so the element can remember its scroll.
             div [ class "content-pane" ]
                 [ pinButton model
+                , starButton (Set.member tab.name model.starred) tab.name
                 , node "raw-html"
                     [ class "content"
                     , property "docName" (E.string tab.name)
@@ -663,6 +686,26 @@ pinButton model =
             )
         ]
         [ text "📌" ]
+
+
+{-| The star toggle, sitting just below the pin. A purely manual mark: bright when
+this document is starred, faint otherwise. Starred documents carry a star in the
+dropdown, so a design doc or plan stays easy to find among churnier output.
+-}
+starButton : Bool -> String -> Html Msg
+starButton starred name =
+    button
+        [ classList [ ( "star", True ), ( "starred", starred ) ]
+        , onClick (ToggleStar name)
+        , title
+            (if starred then
+                "Starred as a reference document. Click to unstar."
+
+             else
+                "Star this document to flag it as a reference in the dropdown."
+            )
+        ]
+        [ text "⭐" ]
 
 
 emptyMessage : List String -> String
