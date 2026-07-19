@@ -281,7 +281,9 @@ Set on the viewer machine, for `bin/claudeview-open`:
 | `GET` | `/events` | SSE stream; emits `data: changed` on any content change (and once on connect). |
 | `GET` | `/content` | JSON snapshot: `{tabs: [{name, html, mtime}], focus, watching: [dir, …]}`. |
 | `GET` | `/media/<name>` | An image file from `WATCH_DIR`, for Markdown `![alt](name.png)`. |
+| `GET` | `/download/<name>` | The tab's raw Markdown, as a file download (`Content-Disposition: attachment`). |
 | `POST` | `/push?tab=<name>` | Write the request body to `<name>.md` in `WATCH_DIR`. |
+| `POST` | `/clear-old` | Prune stale documents. Body `{"delete": [names], "keep": n}`: the viewer sends the exact stale list plus its keep-depth, and the server also sweeps each collapsed directory to its newest `keep` files. |
 
 ## Development
 

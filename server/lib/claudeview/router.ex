@@ -3,8 +3,9 @@ defmodule Claudeview.Router do
   The HTTP surface, a `Plug.Router`: the viewer and its static assets, the JSON
   content snapshot, the SSE stream and the push endpoint.
 
-  Most routes (`/`, `/assets`, `/media`, `/content`, `/push`) build one response
-  and return. `/events` is the exception: it opens a chunked response and then
+  Most routes (`/`, `/assets`, `/media`, `/download`, `/content`, `/push`,
+  `/clear-old`) build one response and return. `/events` is the exception: it
+  opens a chunked response and then
   *stays* in a receive loop (`sse_loop/1` ↔ `send_chunk/2`), forwarding a chunk
   whenever the Store signals `:changed` — and a keep-alive comment otherwise — for
   the life of the connection. `/content` reports the newest-modified tab as the
