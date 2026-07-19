@@ -21,8 +21,8 @@ whether the live connection is up, so an empty screen still tells you where to l
 
 import Browser
 import Dict
-import Html exposing (Html, button, div, node, span, text)
-import Html.Attributes exposing (class, classList, property, title)
+import Html exposing (Html, a, button, div, node, span, text)
+import Html.Attributes exposing (attribute, class, classList, href, property, title)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as D
@@ -771,6 +771,7 @@ contentPane model =
             div [ class "content-pane" ]
                 [ pinButton model
                 , starButton (Set.member tab.name model.starred) tab.name
+                , downloadButton tab.name
                 , node "raw-html"
                     [ class "content"
                     , property "docName" (E.string tab.name)
@@ -821,6 +822,22 @@ starButton starred name =
             )
         ]
         [ text "⭐" ]
+
+
+{-| The download control, fixed to the body's top-right — mirroring the pin and
+star on the left so it reads as "about this document". A plain anchor to the
+server's `/download/<name>` route: the same-origin `download` attribute names
+the saved file, and the server streams the raw Markdown from disk.
+-}
+downloadButton : String -> Html Msg
+downloadButton name =
+    a
+        [ class "download"
+        , href ("/download/" ++ name)
+        , attribute "download" (name ++ ".md")
+        , title "Download this document as Markdown"
+        ]
+        [ text "⬇" ]
 
 
 emptyMessage : List String -> String
