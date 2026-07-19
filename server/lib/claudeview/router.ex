@@ -162,12 +162,21 @@ defmodule Claudeview.Router do
   end
 
   # The newest `*.md` in a collapsed directory — the one its single tab shows.
+  # Reads mtime as `:posix` (matching Watcher/Gc) and tolerates a file that
+  # vanishes mid-scan rather than raising, the way `File.stat!` would.
   @spec newest_md(String.t()) :: Path.t() | nil
   defp newest_md(dir) do
     dir
     |> Path.join("*.md")
     |> Path.wildcard()
-    |> Enum.max_by(&File.stat!(&1).mtime, fn -> nil end)
+    |> Enum.max_by(&mtime/1, fn -> nil end)
+  end
+
+  defp mtime(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %File.Stat{mtime: mtime}} -> mtime
+      {:error, _} -> 0
+    end
   end
 
   # Tolerant JSON body decode: a malformed or empty body clears nothing rather
