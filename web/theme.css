@@ -421,6 +421,13 @@ html, body {
   background: var(--surface);
 }
 
+/* A table sits flush against what follows. A heading already brings its own
+   space above (grouping it with its text); a paragraph directly below does not,
+   so give it the same gap that separates two paragraphs. */
+.content table + p {
+  margin-top: 1.15em;
+}
+
 .content blockquote {
   margin: 1.2em auto;
   padding-left: 16px;
