@@ -45,6 +45,13 @@ port sseStatus : (Bool -> msg) -> Sub msg
 port setTheme : String -> Cmd msg
 
 
+{-| Raised when a refresh brought genuinely new or updated documents, so the page
+can mark the browser tab if it is currently hidden. Distinct from the in-page dot:
+this is about the whole window being in the background, so it ignores focus and pin.
+-}
+port notifyUpdate : () -> Cmd msg
+
+
 {-| The `raw-html` element reports whether its scroll sits at the top, so the
 model can auto-pin the moment you scroll away and unpin when you return.
 -}
@@ -80,6 +87,7 @@ type alias Model =
     , pin : Pin -- how the pane holds still: follow scroll, or a manual hold
     , atTop : Bool -- the reading pane is scrolled to the top
     , alerts : Set String -- group keys that gained new content while pinned
+    , loaded : Bool -- a first snapshot is in hand; gates the initial load from marking the tab
     }
 
 
@@ -87,7 +95,7 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty }
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty, loaded = False }
     , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
     )
 
@@ -140,12 +148,22 @@ update msg model =
             ( { model | connected = connected }, Cmd.none )
 
         GotContent (Ok content) ->
-            ( if isPinned model then
-                holdInPlace model content
+            let
+                updated =
+                    if isPinned model then
+                        holdInPlace model content
+
+                    else
+                        adoptFocus model content
+            in
+            -- Mark the browser tab on a real change, but never for the first
+            -- snapshot — that is the page establishing its baseline, not news.
+            ( { updated | loaded = True }
+            , if model.loaded && hasFreshContent model content then
+                notifyUpdate ()
 
               else
-                adoptFocus model content
-            , Cmd.none
+                Cmd.none
             )
 
         GotContent (Err _) ->
@@ -234,6 +252,20 @@ markAlerts model content =
         |> List.filter (\t -> Just t.name /= model.focus)
         |> List.map (.name >> groupKey)
         |> List.foldl Set.insert model.alerts
+
+
+{-| Did this refresh bring content we did not have before — a new document or a
+bumped mtime? Compared against our last snapshot across all tabs; focus and pin
+are irrelevant here, the question is only whether anything changed while the
+window may have been in the background.
+-}
+hasFreshContent : Model -> Content -> Bool
+hasFreshContent model content =
+    let
+        prev =
+            Dict.fromList (List.map (\t -> ( t.name, t.mtime )) model.tabs)
+    in
+    List.any (\t -> Dict.get t.name prev /= Just t.mtime) content.tabs
 
 
 {-| Drop the dot for the group a focused document belongs to — it has been seen.

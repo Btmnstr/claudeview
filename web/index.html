@@ -15,6 +15,9 @@
     })();
   </script>
   <link rel="stylesheet" href="/assets/theme.css">
+  <!-- Filled in by JS below with a self-contained SVG, swapped for a badged
+       variant when an update lands while this tab is hidden. -->
+  <link id="favicon" rel="icon">
 </head>
 <body>
   <div id="app"></div>
@@ -95,15 +98,57 @@
       app.ports.sseStatus.send(false);
     };
 
+    // Browser-tab marker. The favicon is a self-contained SVG — it carries its
+    // own accent background, so it reads on a light or dark tab strip — and the
+    // badged variant adds a red corner dot. Elm raises notifyUpdate only when a
+    // refresh brought genuinely new content; we mark the tab if it is hidden, and
+    // both the favicon and a "●" title prefix clear when the tab is activated.
+    var favicon = document.getElementById("favicon");
+    var icon = function (badged) {
+      return "data:image/svg+xml," + encodeURIComponent(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
+          "<rect width='32' height='32' rx='7' fill='#2f5fa0'/>" +
+          "<rect x='9' y='9' width='14' height='2.6' rx='1.3' fill='#fff'/>" +
+          "<rect x='9' y='14.7' width='14' height='2.6' rx='1.3' fill='#fff'/>" +
+          "<rect x='9' y='20.4' width='9' height='2.6' rx='1.3' fill='#fff'/>" +
+          (badged
+            ? "<circle cx='25' cy='7' r='6.5' fill='#faf9f5'/>" +
+              "<circle cx='25' cy='7' r='4.5' fill='#e5484d'/>"
+            : "") +
+        "</svg>");
+    };
+    var PLAIN = icon(false), BADGED = icon(true);
+    favicon.href = PLAIN;
+
+    var marked = false;
+    var markTab = function () {
+      if (marked) return;
+      marked = true;
+      favicon.href = BADGED;
+      document.title = "● ClaudeView";
+    };
+    var clearTab = function () {
+      if (!marked) return;
+      marked = false;
+      favicon.href = PLAIN;
+      document.title = "ClaudeView";
+    };
+
+    // Mark the tab strip only when the update arrives on a tab the user is not
+    // looking at — exactly the "wrong tab is active" case (document.hidden).
+    app.ports.notifyUpdate.subscribe(function () {
+      if (document.hidden) markTab();
+    });
+
     // A backgrounded tab can be frozen or throttled, and an SSE "changed" that
     // arrives then may be dropped — the keep-alive holds the connection open, so
     // no reconnect re-syncs it and the view goes stale. Treat re-activation as a
-    // sync point: refetch by replaying the same "changed" nudge Elm acts on.
-    var resync = function () { app.ports.sseMessage.send("changed"); };
+    // sync point: clear any tab marker and replay the "changed" nudge Elm acts on.
+    var onActivate = function () { clearTab(); app.ports.sseMessage.send("changed"); };
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") resync();
+      if (document.visibilityState === "visible") onActivate();
     });
-    window.addEventListener("focus", resync);
+    window.addEventListener("focus", onActivate);
   </script>
 </body>
 </html>
