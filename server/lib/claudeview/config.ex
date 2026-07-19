@@ -24,6 +24,11 @@ defmodule Claudeview.Config do
   @spec join_window_s() :: integer()
   def join_window_s, do: env_int("JOIN_WINDOW_S", 120)
 
+  @doc "How many documents a tab-group keeps when \"Clear old\" prunes it. The client
+  sends its own value; this is the server-side fallback and the plan-dir sweep's default."
+  @spec keep_per_group() :: integer()
+  def keep_per_group, do: env_int("KEEP_PER_GROUP", 10)
+
   @doc "Raw `WATCH_DIR` (colon-separated specs); parse with `Watcher.parse_specs/1`."
   @spec watch_dir() :: String.t()
   def watch_dir, do: System.get_env("WATCH_DIR", @default_watch_dir)

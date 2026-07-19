@@ -69,6 +69,19 @@ defmodule Claudeview.Router do
     send_resp(conn, 200, "ok\n")
   end
 
+  # "Clear old" garbage collection. The viewer, which alone knows the grouping and
+  # which documents are starred, sends the exact list of stale tabs to delete plus
+  # its keep-count; the server just removes their files. It also sweeps each
+  # collapsed (plan-mode) directory down to the newest `keep` files — those pile up
+  # invisibly, so the UI can't name them. Body: {"delete": [names], "keep": n}.
+  post "/clear-old" do
+    {:ok, body, conn} = read_body(conn)
+    params = decode_body(body)
+    names = Map.get(params, "delete", [])
+    keep = Map.get(params, "keep", Claudeview.Config.keep_per_group())
+    send_resp(conn, 200, "removed #{clear_old(names, keep)}\n")
+  end
+
   match _ do
     not_found(conn)
   end
@@ -102,6 +115,31 @@ defmodule Claudeview.Router do
     |> Claudeview.Watcher.parse_specs()
     |> List.first()
     |> elem(0)
+  end
+
+  # Tolerant JSON body decode: a malformed or empty body clears nothing rather
+  # than crashing the request.
+  defp decode_body(body) do
+    case Jason.decode(body) do
+      {:ok, %{} = map} -> map
+      _ -> %{}
+    end
+  end
+
+  # Delete the named stale tabs from the per-file dirs, then sweep each collapsed
+  # directory to its newest `keep` files — together leaving the watch tree
+  # mirroring what the UI still shows. Returns the number of files removed. The
+  # watcher's next poll would drop the vanished tabs on its own; the explicit
+  # `Store.drop/1` makes them disappear from the viewer at once. `Claudeview.Gc`
+  # does the disk work; name sanitization stays here where `safe_name/1` lives.
+  defp clear_old(names, keep) do
+    specs = Claudeview.Watcher.parse_specs(Claudeview.Config.watch_dir())
+    per_file = for {dir, nil} <- specs, do: dir
+    collapsed = for {dir, tab} <- specs, tab != nil, do: dir
+
+    removed = Claudeview.Gc.remove(Enum.map(names, &safe_name/1), per_file)
+    Enum.each(removed, &Claudeview.Store.drop/1)
+    length(removed) + Claudeview.Gc.sweep(collapsed, keep)
   end
 
   # Host-facing description of what the server is watching, one entry per
