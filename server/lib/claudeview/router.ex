@@ -31,6 +31,26 @@ defmodule Claudeview.Router do
     send_static(conn, Path.join(Claudeview.Config.watch_dir(), safe_name(name)))
   end
 
+  # Hand back a document's raw Markdown as a download. The tab name resolves to a
+  # real `.md` on disk (see resolve_download/1); the browser's same-origin
+  # `download` attribute names the saved file, and the headers make a direct hit
+  # save rather than render too.
+  get "/download/:name" do
+    case resolve_download(name) do
+      nil ->
+        not_found(conn)
+
+      path ->
+        conn
+        |> put_resp_content_type("text/markdown")
+        |> put_resp_header(
+          "content-disposition",
+          ~s(attachment; filename="#{safe_name(name)}.md")
+        )
+        |> send_file(200, path)
+    end
+  end
+
   get "/content" do
     tabs =
       Claudeview.Store.snapshot()
@@ -115,6 +135,36 @@ defmodule Claudeview.Router do
     |> Claudeview.Watcher.parse_specs()
     |> List.first()
     |> elem(0)
+  end
+
+  # Resolve a tab name to the `.md` file behind it, or nil when none exists. The
+  # two watch modes locate it differently (mirroring `Claudeview.Watcher`): a
+  # per-file dir holds `<name>.md` directly, while a collapsed `DIR=TAB` dir shows
+  # its newest file under the fixed tab name, so we hand back that same newest file.
+  @spec resolve_download(String.t()) :: Path.t() | nil
+  defp resolve_download(name) do
+    Claudeview.Config.watch_dir()
+    |> Claudeview.Watcher.parse_specs()
+    |> Enum.find_value(fn
+      {dir, nil} ->
+        path = Path.join(dir, safe_name(name) <> ".md")
+        if File.exists?(path), do: path
+
+      {dir, ^name} ->
+        newest_md(dir)
+
+      {_dir, _tab} ->
+        nil
+    end)
+  end
+
+  # The newest `*.md` in a collapsed directory — the one its single tab shows.
+  @spec newest_md(String.t()) :: Path.t() | nil
+  defp newest_md(dir) do
+    dir
+    |> Path.join("*.md")
+    |> Path.wildcard()
+    |> Enum.max_by(&File.stat!(&1).mtime, fn -> nil end)
   end
 
   # Tolerant JSON body decode: a malformed or empty body clears nothing rather
