@@ -360,83 +360,64 @@ html, body {
   flex: 1;
 }
 
-/* The pin toggle, anchored to the body's top-left, clear of the centred prose.
-   Faint and grey when unpinned; full-colour when pinned — no border, the
-   fade and desaturation carry the contrast on their own. */
-.content-pane .pin {
+/* Pin, star and download — the faint corner controls over the reading surface.
+   They share one treatment: faint and grey at rest, less faint on hover,
+   full-colour when active. Only their position, their element reset (button vs
+   anchor) and their active state differ, and those are split out below. */
+.content-pane .pin,
+.content-pane .star,
+.content-pane .download {
   position: absolute;
+  z-index: 5;
+  font-size: 0.9em;
+  line-height: 1;
+  padding: 4px 6px;
+  background: var(--bg);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.content-pane .pin:hover,
+.content-pane .star:hover,
+.content-pane .download:hover {
+  opacity: 0.7;
+}
+
+/* The two buttons drop their native border; the anchor drops its underline and
+   link colour so it reads as an icon, not a link. */
+.content-pane .pin,
+.content-pane .star {
+  border: none;
+}
+
+.content-pane .download {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Positions: pin top-left, star just below it, download top-right. */
+.content-pane .pin {
   top: 10px;
   left: 12px;
-  z-index: 5;
-  font-size: 0.9em;
-  line-height: 1;
-  padding: 4px 6px;
-  background: var(--bg);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  opacity: 0.35;
-  filter: grayscale(1);
 }
 
-.content-pane .pin:hover {
-  opacity: 0.7;
-}
-
-.content-pane .pin.pinned {
-  opacity: 1;
-  filter: none;
-}
-
-/* The star toggle, sitting just below the pin and sharing its faint-until-active
-   treatment. A purely manual mark: full-colour once a document is starred. */
 .content-pane .star {
-  position: absolute;
   top: 44px;
   left: 12px;
-  z-index: 5;
-  font-size: 0.9em;
-  line-height: 1;
-  padding: 4px 6px;
-  background: var(--bg);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  opacity: 0.35;
-  filter: grayscale(1);
 }
 
-.content-pane .star:hover {
-  opacity: 0.7;
+.content-pane .download {
+  top: 10px;
+  right: 12px;
 }
 
+/* Full-colour once active — pinned, or starred. */
+.content-pane .pin.pinned,
 .content-pane .star.starred {
   opacity: 1;
   filter: none;
-}
-
-/* The download control, anchored to the body's top-right — mirroring the pin and
-   star on the left. Shares their faint-until-hover treatment; an anchor, not a
-   button, so it needs its own colour and text-decoration reset. */
-.content-pane .download {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 5;
-  font-size: 0.9em;
-  line-height: 1;
-  padding: 4px 6px;
-  background: var(--bg);
-  border-radius: 6px;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  opacity: 0.35;
-  filter: grayscale(1);
-}
-
-.content-pane .download:hover {
-  opacity: 0.7;
 }
 
 /* A starred document's mark in the dropdown, ahead of its label. */
