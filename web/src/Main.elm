@@ -140,6 +140,7 @@ type Msg
     | ToggleStar String
     | ArmClear
     | ConfirmClear
+    | CancelClear
     | GotCleared (Result Http.Error ())
     | Scrolled Bool
 
@@ -231,6 +232,10 @@ update msg model =
             -- Second click: send the stale list for deletion and disarm. The server
             -- removes the files; the watcher's next poll refreshes every viewer.
             ( { model | pendingClear = False }, clearOld (currentStale model) )
+
+        CancelClear ->
+            -- The visible way out of the armed state, beside the confirm half.
+            ( { model | pendingClear = False }, Cmd.none )
 
         GotCleared _ ->
             -- Refresh at once rather than wait for the poll's SSE ping; a failed
@@ -589,8 +594,9 @@ header model =
 
 
 {-| "Clear old": a two-stage control so an irreversible delete needs a deliberate
-second click. Idle it prunes on the next click; armed it shows the count and the
-next click confirms. It hides entirely when there is nothing to clear.
+second click. Idle it prunes on the next click; armed it splits into a red confirm
+half and a yellow Cancel half, so the way out sits beside the trigger. It hides
+entirely when there is nothing to clear.
 -}
 clearButton : Model -> Html Msg
 clearButton model =
@@ -600,9 +606,12 @@ clearButton model =
 
         count ->
             if model.pendingClear then
-                button
-                    [ class "clear-old armed", onClick ConfirmClear ]
-                    [ text ("Delete " ++ String.fromInt count ++ " old?") ]
+                span [ class "clear-confirm" ]
+                    [ button [ class "clear-old armed", onClick ConfirmClear ]
+                        [ text ("Delete " ++ String.fromInt count) ]
+                    , button [ class "clear-cancel", onClick CancelClear ]
+                        [ text "Cancel" ]
+                    ]
 
             else
                 button

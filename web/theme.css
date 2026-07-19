@@ -195,6 +195,34 @@ html, body {
   background: #d33a3f;
 }
 
+/* Armed, the confirm and Cancel halves read as one split control (like a tab and
+   its caret): the red confirm squares its right corners to butt flush against the
+   yellow Cancel, which offers the visible way out of the confirmation. */
+.header .clear-confirm {
+  display: inline-flex;
+}
+
+.header .clear-confirm .clear-old.armed {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.header .clear-cancel {
+  font: inherit;
+  line-height: 1;
+  padding: 2px 10px;
+  color: #3a2e00;
+  background: #f0b429;
+  border: 1px solid #f0b429;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+}
+
+.header .clear-cancel:hover {
+  background: #d99e12;
+}
+
 /* Tab strip */
 
 .tabs {
