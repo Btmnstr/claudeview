@@ -166,6 +166,35 @@ html, body {
   color: var(--fg);
 }
 
+/* "Clear old" — same quiet chrome as the theme toggle when idle. Armed (awaiting
+   the confirming second click) it turns a warning red so a destructive, one-way
+   delete never reads as an ordinary button. */
+.header .clear-old {
+  font: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.header .clear-old:hover {
+  color: var(--fg);
+}
+
+.header .clear-old.armed {
+  color: #fff;
+  background: #e5484d;
+  border-color: #e5484d;
+}
+
+.header .clear-old.armed:hover {
+  color: #fff;
+  background: #d33a3f;
+}
+
 /* Tab strip */
 
 .tabs {

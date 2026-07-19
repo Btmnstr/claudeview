@@ -5,6 +5,7 @@ content/*
 # Build artifacts (produced inside Docker).
 server/_build/
 server/deps/
+server/tmp/
 web/elm-stuff/
 web/elm.js
 *.beam

@@ -88,6 +88,7 @@ type alias Model =
     , atTop : Bool -- the reading pane is scrolled to the top
     , alerts : Set String -- group keys that gained new content while pinned
     , starred : Set String -- tab names manually marked as reference documents
+    , pendingClear : Bool -- "Clear old" armed, awaiting the confirming second click
     , loaded : Bool -- a first snapshot is in hand; gates the initial load from marking the tab
     }
 
@@ -96,7 +97,7 @@ type alias Model =
 -}
 init : String -> ( Model, Cmd Msg )
 init theme =
-    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty, starred = Set.empty, loaded = False }
+    ( { tabs = [], focus = Nothing, watching = [], connected = False, theme = theme, openGroup = Nothing, now = 0, pin = FollowScroll, atTop = True, alerts = Set.empty, starred = Set.empty, pendingClear = False, loaded = False }
     , Cmd.batch [ fetchContent, Task.perform Tick Time.now ]
     )
 
@@ -137,6 +138,9 @@ type Msg
     | ToggleTheme
     | TogglePin
     | ToggleStar String
+    | ArmClear
+    | ConfirmClear
+    | GotCleared (Result Http.Error ())
     | Scrolled Bool
 
 
@@ -160,7 +164,9 @@ update msg model =
             in
             -- Mark the browser tab on a real change, but never for the first
             -- snapshot — that is the page establishing its baseline, not news.
-            ( { updated | loaded = True }
+            -- A content change may shift what counts as stale, so disarm any
+            -- pending "Clear old" rather than let it fire against a stale count.
+            ( { updated | loaded = True, pendingClear = False }
             , if model.loaded && hasFreshContent model content then
                 notifyUpdate ()
 
@@ -174,7 +180,7 @@ update msg model =
         Focus name ->
             -- Selecting a document starts unpinned-at-top, closes the menu, and
             -- clears this group's dot (the newest doc is the one it flagged).
-            ( { model | focus = Just name, openGroup = Nothing, pin = FollowScroll, atTop = True, alerts = clearAlert (Just name) model.alerts }, Cmd.none )
+            ( { model | focus = Just name, openGroup = Nothing, pin = FollowScroll, atTop = True, alerts = clearAlert (Just name) model.alerts, pendingClear = False }, Cmd.none )
 
         ToggleGroup key ->
             ( { model | openGroup = toggleOpen key model.openGroup }, Cmd.none )
@@ -194,7 +200,7 @@ update msg model =
                     else
                         "dark"
             in
-            ( { model | theme = next }, setTheme next )
+            ( { model | theme = next, pendingClear = False }, setTheme next )
 
         TogglePin ->
             -- Take manual control of the *effective* state, so a click while
@@ -215,6 +221,21 @@ update msg model =
             -- A manual, sticky mark on a single document; unlike the pin it never
             -- moves on its own. Toggles membership in the starred set.
             ( { model | starred = toggleMember name model.starred }, Cmd.none )
+
+        ArmClear ->
+            -- First click: arm the confirmation, but only when there is something
+            -- to remove, so an idle click never leaves the button hanging armed.
+            ( { model | pendingClear = not (List.isEmpty (currentStale model)) }, Cmd.none )
+
+        ConfirmClear ->
+            -- Second click: send the stale list for deletion and disarm. The server
+            -- removes the files; the watcher's next poll refreshes every viewer.
+            ( { model | pendingClear = False }, clearOld (currentStale model) )
+
+        GotCleared _ ->
+            -- Refresh at once rather than wait for the poll's SSE ping; a failed
+            -- request simply leaves the content as the next fetch finds it.
+            ( model, fetchContent )
 
         Scrolled top ->
             ( { model | atTop = top }, Cmd.none )
@@ -310,6 +331,25 @@ toggleMember x set =
 fetchContent : Cmd Msg
 fetchContent =
     Http.get { url = "/content", expect = Http.expectJson GotContent decoder }
+
+
+{-| Ask the server to delete the given stale documents. The keep-count rides along
+so the server sweeps its collapsed (plan-mode) directories to the same depth. The
+response carries nothing we need — a follow-up `fetchContent` shows the result.
+-}
+clearOld : List String -> Cmd Msg
+clearOld names =
+    Http.post
+        { url = "/clear-old"
+        , body =
+            Http.jsonBody
+                (E.object
+                    [ ( "delete", E.list E.string names )
+                    , ( "keep", E.int keepPerGroup )
+                    ]
+                )
+        , expect = Http.expectWhatever GotCleared
+        }
 
 
 decoder : D.Decoder Content
@@ -460,6 +500,46 @@ toGroups tabs =
             )
 
 
+{-| How many documents a tab-group keeps when "Clear old" prunes it. The number is
+sent to the server so its plan-directory sweep uses the same depth.
+-}
+keepPerGroup : Int
+keepPerGroup =
+    10
+
+
+{-| The stale documents in the current view — the ones "Clear old" would remove.
+-}
+currentStale : Model -> List String
+currentStale model =
+    staleDocs keepPerGroup model.starred (toGroups model.tabs)
+
+
+{-| The documents a cull removes: per group, keep every starred document and the
+newest unstarred up to `keep` in total, and return the rest by name. Starred docs
+are never stale, so an old reference survives a cull of newer, disposable output.
+When a group holds `keep` or more starred docs, they are all kept and every
+unstarred one is stale.
+-}
+staleDocs : Int -> Set String -> List Group -> List String
+staleDocs keep starred groups =
+    List.concatMap (staleInGroup keep starred) groups
+
+
+staleInGroup : Int -> Set String -> Group -> List String
+staleInGroup keep starred group =
+    let
+        ( starredTabs, unstarred ) =
+            List.partition (\t -> Set.member t.name starred) group.tabs
+
+        keptUnstarred =
+            max 0 (keep - List.length starredTabs)
+    in
+    -- `group.tabs` is newest-first, and `partition` preserves that order, so
+    -- dropping the newest `keptUnstarred` leaves exactly the stale remainder.
+    unstarred |> List.drop keptUnstarred |> List.map .name
+
+
 relative : Int -> Int -> String
 relative now mtime =
     let
@@ -502,9 +582,35 @@ header model =
         , span
             [ classList [ ( "status", True ), ( "live", model.connected ) ] ]
             [ text (statusLabel model.connected) ]
+        , clearButton model
         , button [ class "theme-toggle", onClick ToggleTheme ]
             [ text (themeToggleLabel model.theme) ]
         ]
+
+
+{-| "Clear old": a two-stage control so an irreversible delete needs a deliberate
+second click. Idle it prunes on the next click; armed it shows the count and the
+next click confirms. It hides entirely when there is nothing to clear.
+-}
+clearButton : Model -> Html Msg
+clearButton model =
+    case List.length (currentStale model) of
+        0 ->
+            text ""
+
+        count ->
+            if model.pendingClear then
+                button
+                    [ class "clear-old armed", onClick ConfirmClear ]
+                    [ text ("Delete " ++ String.fromInt count ++ " old?") ]
+
+            else
+                button
+                    [ class "clear-old"
+                    , title "Prune each group to its newest documents (starred kept, files deleted)."
+                    , onClick ArmClear
+                    ]
+                    [ text "Clear old" ]
 
 
 watchingLabel : List String -> String
